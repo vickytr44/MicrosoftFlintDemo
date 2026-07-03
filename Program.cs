@@ -182,7 +182,8 @@ var chatClientAgent = new ChatClientAgent(
     tools: [.. mcpTools]);
 
 // Wrap with shared-state for CopilotKit co-agent state synchronization
-var agent = new FlintSharedStateAgent(chatClientAgent, jsonOptions);
+var stateManager = app.Services.GetRequiredService<ChartStateManager>();
+var agent = new FlintSharedStateAgent(chatClientAgent, stateManager, jsonOptions);
 
 // Map the AG-UI agent endpoint
 app.MapAGUI("/agent", agent);

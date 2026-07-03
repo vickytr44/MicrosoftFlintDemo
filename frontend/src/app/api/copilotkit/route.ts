@@ -12,7 +12,7 @@ const serviceAdapter = new ExperimentalEmptyAdapter();
 // 2. Create the CopilotRuntime pointing at our C# AGUI server
 const runtime = new CopilotRuntime({
   agents: {
-    flint_agent: new HttpAgent({ url: "http://localhost:5000/agent" }),
+    flint_agent: new HttpAgent({ url: "http://127.0.0.1:5000/agent" }),
   },
 });
 

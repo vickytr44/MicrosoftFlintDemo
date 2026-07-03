@@ -36,11 +36,13 @@ public class FlintStateSnapshot
 
 internal sealed class FlintSharedStateAgent : DelegatingAIAgent
 {
+    private readonly ChartStateManager _stateManager;
     private readonly JsonSerializerOptions _jsonSerializerOptions;
 
-    public FlintSharedStateAgent(AIAgent innerAgent, JsonSerializerOptions jsonSerializerOptions)
+    public FlintSharedStateAgent(AIAgent innerAgent, ChartStateManager stateManager, JsonSerializerOptions jsonSerializerOptions)
         : base(innerAgent)
     {
+        _stateManager = stateManager;
         _jsonSerializerOptions = jsonSerializerOptions;
     }
 
@@ -55,82 +57,39 @@ internal sealed class FlintSharedStateAgent : DelegatingAIAgent
         AgentRunOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (options is not ChatClientAgentRunOptions { ChatOptions.AdditionalProperties: { } properties } chatRunOptions ||
-            !properties.TryGetValue("ag_ui_state", out JsonElement state))
+        // 1. Run the standard agent loop (which lets LLM use tools freely, no JSON mode constraints)
+        await foreach (var update in InnerAgent.RunStreamingAsync(messages, thread, options, cancellationToken).ConfigureAwait(false))
         {
-            await foreach (var update in InnerAgent.RunStreamingAsync(messages, thread, options, cancellationToken).ConfigureAwait(false))
-            {
-                yield return update;
-            }
-            yield break;
+            yield return update;
         }
 
-        var firstRunOptions = new ChatClientAgentRunOptions
+        // 2. If it is an AG-UI run, push the updated state snapshot from our local ChartStateManager
+        if (options is ChatClientAgentRunOptions { ChatOptions.AdditionalProperties: { } properties } &&
+            properties.ContainsKey("ag_ui_state"))
         {
-            ChatOptions = chatRunOptions.ChatOptions.Clone(),
-            AllowBackgroundResponses = chatRunOptions.AllowBackgroundResponses,
-            ContinuationToken = chatRunOptions.ContinuationToken,
-            ChatClientFactory = null, // Force using the constructor-passed client (our custom pipeline)
-        };
+            var currentCharts = _stateManager.GetCharts();
 
-        firstRunOptions.ChatOptions.ResponseFormat = ChatResponseFormat.ForJsonSchema<FlintStateSnapshot>(
-            schemaName: "FlintStateSnapshot",
-            schemaDescription: "A response containing the current list of generated charts");
-
-        // Clear tools using an empty list (not null) so the agent does not auto-append constructor tools during this run
-        firstRunOptions.ChatOptions.Tools = new List<AITool>();
-
-        ChatMessage stateUpdateMessage = new(
-            ChatRole.System,
-            [
-                new TextContent("Here is the current state of charts in JSON format:"),
-                new TextContent(state.GetRawText()),
-                new TextContent("Update the state to include any new chart that was just generated. The new state is:")
-            ]);
-
-        var firstRunMessages = messages.Append(stateUpdateMessage);
-
-        var allUpdates = new List<AgentResponseUpdate>();
-        await foreach (var update in InnerAgent.RunStreamingAsync(firstRunMessages, thread, firstRunOptions, cancellationToken).ConfigureAwait(false))
-        {
-            allUpdates.Add(update);
-
-            bool hasNonTextContent = update.Contents.Any(c => c is not TextContent);
-            if (hasNonTextContent)
+            var snapshot = new FlintStateSnapshot
             {
-                yield return update;
-            }
-        }
+                Charts = currentCharts.Select(c => new ChartDataSnapshot
+                {
+                    Id = c.Id,
+                    Timestamp = c.Timestamp.ToString("o"),
+                    Prompt = c.Prompt,
+                    FlintSpec = c.FlintSpec.GetRawText(),
+                    CompiledSpec = c.CompiledSpec.GetRawText(),
+                    Backend = c.Backend
+                }).ToList()
+            };
 
-        var response = allUpdates.ToAgentResponse();
-
-        if (response.TryDeserialize(_jsonSerializerOptions, out JsonElement stateSnapshot))
-        {
             byte[] stateBytes = JsonSerializer.SerializeToUtf8Bytes(
-                stateSnapshot,
-                _jsonSerializerOptions.GetTypeInfo(typeof(JsonElement)));
+                snapshot,
+                FlintAgentSerializerContext.Default.FlintStateSnapshot);
+
             yield return new AgentResponseUpdate
             {
                 Contents = [new DataContent(stateBytes, "application/json")]
             };
-        }
-        else
-        {
-            yield break;
-        }
-
-        bool stateChanged = true;
-        var summaryMessage = new ChatMessage(
-            ChatRole.System,
-            [new TextContent("Please provide a concise description about the chart that was created or updated in at most two sentences.")]);
-
-        var secondRunMessages = messages.Concat(response.Messages);
-        if (stateChanged)
-            secondRunMessages = secondRunMessages.Append(summaryMessage);
-
-        await foreach (var update in InnerAgent.RunStreamingAsync(secondRunMessages, thread, options, cancellationToken).ConfigureAwait(false))
-        {
-            yield return update;
         }
     }
 }
