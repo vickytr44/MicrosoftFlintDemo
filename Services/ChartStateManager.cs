@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using FlintChartAgent.Services.Abstractions;
 
 namespace FlintChartAgent.Services;
 
@@ -17,7 +18,7 @@ public sealed class ChartData
 /// Thread-safe in-memory store for generated charts.
 /// Notifies connected SSE clients whenever a new chart is added.
 /// </summary>
-public sealed class ChartStateManager
+public sealed class ChartStateManager : IChartStateManager
 {
     private readonly ConcurrentQueue<ChartData> _charts = new();
     private const int MaxHistory = 50;

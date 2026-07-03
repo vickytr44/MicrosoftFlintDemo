@@ -1,4 +1,5 @@
 using FlintChartAgent.Configuration;
+using FlintChartAgent.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Client;
@@ -7,9 +8,9 @@ namespace FlintChartAgent.Services;
 
 /// <summary>
 /// Manages the lifecycle of the Flint Chart MCP server connection.
-/// Implements <see cref="IAsyncDisposable"/> to cleanly shut down the MCP server process.
+/// Implements <see cref="IMcpService"/> to cleanly shut down the MCP server process.
 /// </summary>
-public sealed class FlintMcpService : IAsyncDisposable
+public sealed class FlintMcpService : IMcpService
 {
     private readonly McpSettings _settings;
     private readonly ILogger<FlintMcpService> _logger;

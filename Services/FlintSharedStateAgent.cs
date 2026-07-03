@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using FlintChartAgent.Services.Abstractions;
 
 namespace FlintChartAgent.Services;
 
@@ -36,10 +37,10 @@ public class FlintStateSnapshot
 
 internal sealed class FlintSharedStateAgent : DelegatingAIAgent
 {
-    private readonly ChartStateManager _stateManager;
+    private readonly IChartStateReader _stateManager;
     private readonly JsonSerializerOptions _jsonSerializerOptions;
 
-    public FlintSharedStateAgent(AIAgent innerAgent, ChartStateManager stateManager, JsonSerializerOptions jsonSerializerOptions)
+    public FlintSharedStateAgent(AIAgent innerAgent, IChartStateReader stateManager, JsonSerializerOptions jsonSerializerOptions)
         : base(innerAgent)
     {
         _stateManager = stateManager;

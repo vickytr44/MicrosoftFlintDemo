@@ -1,21 +1,21 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.AI;
+using FlintChartAgent.Services.Abstractions;
 
 namespace FlintChartAgent.Services;
 
 /// <summary>
 /// Intercepts chat completions, checks for Flint Chart MCP tool executions,
-/// extracts the chart specifications and results, and pushes them to <see cref="ChartStateManager"/>.
+/// and delegates processing to the <see cref="IChartProcessor"/>.
 /// </summary>
 public sealed class ChartInterceptingChatClient : DelegatingChatClient
 {
-    private readonly ChartStateManager _stateManager;
+    private readonly IChartProcessor _chartProcessor;
 
-    public ChartInterceptingChatClient(IChatClient innerClient, ChartStateManager stateManager)
+    public ChartInterceptingChatClient(IChatClient innerClient, IChartProcessor chartProcessor)
         : base(innerClient)
     {
-        _stateManager = stateManager;
+        _chartProcessor = chartProcessor;
     }
 
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
@@ -77,13 +77,13 @@ public sealed class ChartInterceptingChatClient : DelegatingChatClient
                                     .OfType<FunctionCallContent>()
                                     .FirstOrDefault(c => c.CallId == result.CallId);
 
-                                if (call is not null && IsChartTool(call.Name))
+                                if (call is not null && _chartProcessor.IsChartTool(call.Name))
                                 {
                                     // Find the last user prompt
                                     int lastUserIndex = messageList.FindLastIndex(m => m.Role == ChatRole.User);
                                     var lastUserPrompt = lastUserIndex >= 0 ? messageList[lastUserIndex].Text ?? "Generated Chart" : "Generated Chart";
 
-                                    TryProcessChartTool(lastUserPrompt, call, result.Result);
+                                    _chartProcessor.ProcessToolCall(lastUserPrompt, call, result.Result);
                                     break;
                                 }
                             }
@@ -91,101 +91,6 @@ public sealed class ChartInterceptingChatClient : DelegatingChatClient
                     }
                 }
             }
-        }
-    }
-
-    private static bool IsChartTool(string name)
-        => name == "compile_chart" || name == "render_chart" || name == "create_chart_view";
-
-    private void TryProcessChartTool(string prompt, FunctionCallContent call, object result)
-    {
-        try
-        {
-            // Serialize function call arguments
-            var argsJson = JsonSerializer.Serialize(call.Arguments);
-            using var doc = JsonDocument.Parse(argsJson);
-            var root = doc.RootElement;
-
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return;
-            }
-
-            // Handle nested 'spec' wrapper (e.g. create_chart_view) or root properties
-            var target = root;
-            if (root.TryGetProperty("spec", out var specWrapper))
-            {
-                if (specWrapper.ValueKind == JsonValueKind.String)
-                {
-                    try
-                    {
-                        using var specDoc = JsonDocument.Parse(specWrapper.GetString() ?? "{}");
-                        target = specDoc.RootElement.Clone();
-                    }
-                    catch
-                    {
-                        target = specWrapper;
-                    }
-                }
-                else
-                {
-                    target = specWrapper;
-                }
-            }
-
-            if (target.ValueKind != JsonValueKind.Object)
-            {
-                return;
-            }
-
-            // Safe extractions
-            target.TryGetProperty("data", out var data);
-            target.TryGetProperty("semantic_types", out var semanticTypes);
-            target.TryGetProperty("chart_spec", out var chartSpec);
-            
-            string backend = "vegalite";
-            if (root.TryGetProperty("backend", out var backendProp) && backendProp.ValueKind == JsonValueKind.String)
-            {
-                backend = backendProp.GetString() ?? "vegalite";
-            }
-
-            // Reconstruct the full FlintSpec as a JSON element
-            var specObj = new Dictionary<string, object?>();
-            if (data.ValueKind != JsonValueKind.Undefined) specObj["data"] = data;
-            if (semanticTypes.ValueKind != JsonValueKind.Undefined) specObj["semantic_types"] = semanticTypes;
-            if (chartSpec.ValueKind != JsonValueKind.Undefined) specObj["chart_spec"] = chartSpec;
-
-            var flintSpecJson = JsonSerializer.SerializeToElement(specObj);
-
-            // Parse result
-            JsonElement compiledSpecJson = flintSpecJson;
-            if (call.Name == "compile_chart")
-            {
-                if (result is string resultStr)
-                {
-                    try
-                    {
-                        using var resultDoc = JsonDocument.Parse(resultStr);
-                        compiledSpecJson = resultDoc.RootElement.Clone();
-                    }
-                    catch
-                    {
-                        compiledSpecJson = JsonSerializer.SerializeToElement(result);
-                    }
-                }
-                else
-                {
-                    compiledSpecJson = JsonSerializer.SerializeToElement(result);
-                }
-            }
-
-            _stateManager.AddChart(prompt, flintSpecJson, compiledSpecJson, backend);
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"\n⚠️ Warning: Chart interceptor failed to parse tool call: {ex.Message}");
-            Console.ResetColor();
         }
     }
 }
