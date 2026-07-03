@@ -11,4 +11,9 @@ public interface IMcpService : IAsyncDisposable
     /// Establishes a connection to the MCP server and returns the discovered tools.
     /// </summary>
     Task<IList<McpClientTool>> ConnectAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Exposes the underlying McpClient instance.
+    /// </summary>
+    McpClient? Client { get; }
 }

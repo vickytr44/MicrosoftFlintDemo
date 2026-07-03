@@ -1,5 +1,7 @@
+using System.Linq;
 using System.Text.Json;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Mcp;
 using Microsoft.Extensions.AI;
 using FlintChartAgent.Services.Abstractions;
 
@@ -11,6 +13,7 @@ namespace FlintChartAgent.Services.Implementations;
 public sealed class FlintAgentInitializer(
     IMcpService mcpService,
     IChatClient chatClient,
+    ILoggerFactory loggerFactory,
     IPromptProvider promptProvider,
     IChartStateReader stateReader) : IAgentInitializer
 {
@@ -29,16 +32,52 @@ public sealed class FlintAgentInitializer(
             Console.WriteLine($"   🔧 {tool.Name}: {truncated}");
         }
 
-        // Create the ChatClientAgent with the MCP tools
+        // Build the AgentSkillsProvider that discovers skills over MCP
+        AgentSkillsProvider? skillsProvider = null;
+        if (mcpService.Client is not null)
+        {
+            try
+            {
+                skillsProvider = new AgentSkillsProviderBuilder()
+                    .UseMcpSkills(mcpService.Client)
+                    .Build();
+                
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("📖 Registered AgentSkillsProvider for Flint Chart MCP skills!");
+                Console.ResetColor();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to build MCP Skills Provider: {ex.Message}");
+            }
+        }
+
+        // Configure the ChatClientAgent using options
+        var agentOptions = new ChatClientAgentOptions
+        {
+            Name = "FlintChartAgent",
+            Description = "A data visualization assistant that creates charts using the Flint chart system.",
+            ChatOptions = new()
+            {
+                Instructions = promptProvider.SystemPrompt,
+                Tools = [.. mcpTools]
+            }
+        };
+
+        if (skillsProvider is not null)
+        {
+            agentOptions.AIContextProviders = [skillsProvider];
+        }
+
+        // Create the ChatClientAgent
         var chatClientAgent = new ChatClientAgent(
             chatClient,
-            instructions: promptProvider.SystemPrompt,
-            name: "FlintChartAgent",
-            description: "A data visualization assistant that creates charts using the Flint chart system.",
-            tools: [.. mcpTools]);
+            agentOptions,
+            loggerFactory: loggerFactory);
 
         // Wrap with shared-state for CopilotKit co-agent state synchronization
-        var agent = new FlintSharedStateAgent(chatClientAgent, stateReader);
+        //var agent = new FlintSharedStateAgent(chatClientAgent, stateReader);
+        var agent = chatClientAgent.AsBuilder().UseLogging(loggerFactory).Build();
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("\n🚀 Flint Chart AGUI Agent initialized successfully.");

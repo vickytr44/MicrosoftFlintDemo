@@ -13,6 +13,7 @@ namespace FlintChartAgent.Services.Implementations;
 public sealed class FlintChatClientFactory(
     IOptions<LlmSettings> llmSettings,
     ApiKeyCredential credential,
+    ILoggerFactory loggerFactory,
     IChartProcessor chartProcessor) : IChatClientFactory
 {
     private readonly LlmSettings _llmSettings = llmSettings.Value;
@@ -30,8 +31,13 @@ public sealed class FlintChatClientFactory(
             .GetChatClient(_llmSettings.Model)
             .AsIChatClient()
             .AsBuilder()
-            .UseFunctionInvocation()
-            .Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
+            .UseOpenTelemetry(sourceName: "FlintChartAgent", configure: options =>
+            {
+                options.EnableSensitiveData = true;
+            })
+            .UseLogging(loggerFactory)
+            .UseFunctionInvocation(loggerFactory)
+            //.Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
             .Build();
     }
 }

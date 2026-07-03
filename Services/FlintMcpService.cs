@@ -17,6 +17,8 @@ public sealed class FlintMcpService(
     private readonly McpSettings _settings = settings.Value;
     private McpClient? _client;
 
+    public McpClient? Client => _client;
+
     /// <summary>
     /// Establishes a connection to the Flint Chart MCP server and returns the discovered tools.
     /// </summary>

@@ -10,6 +10,7 @@ using FlintChartAgent.Services;
 using FlintChartAgent.Services.Abstractions;
 using FlintChartAgent.Services.Implementations;
 using FlintChartAgent.Services.Implementations.Handlers;
+using OpenTelemetry.Trace;
 
 namespace FlintChartAgent.Configuration;
 
@@ -45,6 +46,7 @@ public static class HostingExtensions
         {
             b.AddConsole();
             b.SetMinimumLevel(LogLevel.Warning);
+            b.AddFilter("Microsoft.Extensions.AI", LogLevel.Trace);
         });
 
         // Add CORS for the Next.js frontend
@@ -62,6 +64,12 @@ public static class HostingExtensions
         services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.TypeInfoResolverChain.Add(FlintAgentSerializerContext.Default));
         services.AddAGUI();
+
+        // Configure OpenTelemetry Tracing
+        services.AddOpenTelemetry()
+            .WithTracing(tracing => tracing
+                .AddSource("FlintChartAgent")
+                .AddConsoleExporter());
 
         // Prompt Provider
         services.AddSingleton<IPromptProvider, SystemPromptProvider>();
