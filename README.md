@@ -1,143 +1,129 @@
-# 🪄 Flint Chart Agent
+# Flint Chart Agent — AGUI + CopilotKit
 
-A .NET 8 console application that uses **Groq AI** with the **Flint Chart MCP** server to create beautiful data visualizations through natural language.
+An AI-powered data visualization assistant that creates beautiful, interactive charts through natural language. Built with the [Microsoft Agent Framework](https://github.com/microsoft/agents) (AGUI protocol) and [CopilotKit](https://docs.copilotkit.ai).
 
 ## Architecture
 
 ```
-┌──────────────────────┐     stdio      ┌──────────────────────┐
-│  .NET Console App    │◄──────────────►│  flint-chart-mcp     │
-│                      │   (JSON-RPC)   │  (MCP Server via npx)│
-│  ┌────────────────┐  │               └──────────────────────┘
-│  │ AgentChatService│  │
-│  │ (chat loop)     │  │
-│  └───────┬────────┘  │
-│          │            │
-│  ┌───────▼────────┐  │
-│  │ FlintMcpService │  │
-│  │ (MCP client)    │  │
-│  └────────────────┘  │
-└──────────┬───────────┘
-           │ HTTPS
-           ▼
-┌──────────────────────┐
-│  Groq API            │
-│  (OpenAI-compatible) │
-└──────────────────────┘
+┌──────────────────────────────────────────┐
+│  Next.js Frontend (port 3000)            │
+│  ├─ CopilotSidebar (chat UI)            │
+│  ├─ useCoAgent (shared state)           │
+│  ├─ useRenderToolCall (Generative UI)   │
+│  └─ /api/copilotkit (runtime route)     │
+│        │                                 │
+│        ▼ HTTP (AG-UI protocol)           │
+│  ┌──────────────────────────────┐        │
+│  │  C# AGUI Server (port 5000) │        │
+│  │  ├─ ChatClientAgent         │        │
+│  │  ├─ FlintSharedStateAgent   │        │
+│  │  ├─ ChartInterceptor        │        │
+│  │  └─ Groq LLM Client        │        │
+│  │        │                     │        │
+│  │        ▼ Stdio (MCP)         │        │
+│  │  ┌─────────────────────┐    │        │
+│  │  │  Flint Chart MCP    │    │        │
+│  │  │  Server (npx)       │    │        │
+│  │  └─────────────────────┘    │        │
+│  └──────────────────────────────┘        │
+└──────────────────────────────────────────┘
 ```
 
 ## Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 18+](https://nodejs.org/) (for `npx` to run the Flint Chart MCP server)
-- A [Groq API key](https://console.groq.com/keys)
+- [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) or later
+- [Node.js 18+](https://nodejs.org/) with npm
+- A Groq API key (or any OpenAI-compatible endpoint)
 
-## Setup
+## Quick Start
 
-1. **Navigate to the project directory:**
-   ```bash
-   cd microsoft-flint
-   ```
+### 1. Configure API Key
 
-2. **Set your Groq API key:**
+Copy and edit the development settings:
 
-   **Windows (PowerShell):**
-   ```powershell
-   $env:Llm__ApiKey = "gsk_your-key-here"
-   ```
+```bash
+cp appsettings.json appsettings.development.json
+```
 
-   **Linux/macOS:**
-   ```bash
-   export Llm__ApiKey="gsk_your-key-here"
-   ```
-
-   Or edit `appsettings.json` directly and set the `Llm.ApiKey` field.
-
-3. **Restore and run:**
-   ```bash
-   dotnet restore
-   dotnet run
-   ```
-
-## Configuration
-
-All settings live in [`appsettings.json`](appsettings.json) and can be overridden with environment variables using the `__` (double-underscore) convention.
-
-### LLM Settings (`Llm` section)
-
-| Setting    | Env Variable   | Default                          | Description                          |
-|------------|----------------|----------------------------------|--------------------------------------|
-| `ApiKey`   | `Llm__ApiKey`  | *(required)*                     | API key for the LLM provider         |
-| `Model`    | `Llm__Model`   | `llama-3.3-70b-versatile`       | Model identifier                     |
-| `Endpoint` | `Llm__Endpoint`| `https://api.groq.com/openai/v1`| OpenAI-compatible API base URL       |
-
-### MCP Settings (`Mcp` section)
-
-| Setting      | Default              | Description                          |
-|--------------|----------------------|--------------------------------------|
-| `Command`    | `npx`               | Command to launch the MCP server     |
-| `Arguments`  | `["-y", "flint-chart-mcp"]` | Arguments for the server command |
-| `ServerName` | `flint-chart`        | Display name for the MCP connection  |
-
-### Switching LLM Providers
-
-Since the app uses the OpenAI-compatible API format, you can point it at any compatible provider:
-
-```jsonc
-// OpenAI
+Edit `appsettings.development.json` and set your API key:
+```json
 {
   "Llm": {
-    "ApiKey": "sk-...",
-    "Model": "gpt-4o",
-    "Endpoint": "https://api.openai.com/v1"
-  }
-}
-
-// Azure OpenAI
-{
-  "Llm": {
-    "ApiKey": "your-azure-key",
-    "Model": "gpt-4o",
-    "Endpoint": "https://your-resource.openai.azure.com/openai/deployments/gpt-4o"
+    "ApiKey": "your-groq-api-key-here"
   }
 }
 ```
+
+### 2. Start the C# AGUI Server
+
+```bash
+dotnet run
+```
+
+The AGUI agent server starts at `http://localhost:5000/agent`.
+
+### 3. Start the Next.js Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dashboard opens at `http://localhost:3000`.
+
+### 4. Create Charts!
+
+Open the CopilotKit sidebar and ask the agent to create charts:
+
+- "Create a bar chart of quarterly revenue"
+- "Make a pie chart showing market share: Google 45%, Apple 30%, Microsoft 15%"
+- "Show me a line chart of monthly temperature"
+- "What chart types are available?"
 
 ## Project Structure
 
 ```
-microsoft-flint/
+├── Program.cs                         # AGUI server entry point
+├── FlintChartAgent.csproj             # C# project (net9.0)
+├── appsettings.json                   # Default configuration
+├── appsettings.development.json       # Local API keys (gitignored)
 ├── Configuration/
-│   ├── LlmSettings.cs        # Strongly-typed LLM config
-│   └── McpSettings.cs        # Strongly-typed MCP config
+│   ├── LlmSettings.cs                # LLM endpoint settings
+│   └── McpSettings.cs                # MCP server settings
 ├── Services/
-│   ├── FlintMcpService.cs     # MCP client lifecycle management
-│   └── AgentChatService.cs    # Interactive chat orchestration
-├── Program.cs                 # Composition root (DI wiring)
-├── appsettings.json           # Default configuration
-├── FlintChartAgent.csproj     # Project file
-└── README.md
+│   ├── FlintSharedStateAgent.cs       # AGUI shared state agent
+│   ├── FlintAgentSerializerContext.cs # JSON serialization context
+│   ├── ChartInterceptingChatClient.cs # Chart tool interceptor
+│   ├── ChartStateManager.cs           # In-memory chart store
+│   ├── FlintMcpService.cs             # MCP server connection
+│   └── AgentChatService.cs            # (Legacy) console chat service
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── api/copilotkit/route.ts  # CopilotKit runtime endpoint
+│   │   │   ├── layout.tsx               # Root layout with CopilotKit provider
+│   │   │   ├── page.tsx                 # Dashboard with sidebar + Generative UI
+│   │   │   └── globals.css              # Premium dark theme
+│   │   ├── components/
+│   │   │   └── ChartCard.tsx            # Vega-Lite chart renderer
+│   │   └── lib/
+│   │       └── types.ts                 # Shared state types
+│   └── package.json
+└── .gitignore
 ```
 
-## Usage
+## Key Technologies
 
-Once running, type natural language requests to create charts:
-
-```
-📊 You: Create a bar chart showing sales by quarter
-
-🤖 Agent: I'll create that for you! Let me compile a Flint chart spec...
-   [calls compile_chart tool]
-   Here's your bar chart specification compiled to Vega-Lite: ...
-```
-
-### Example Prompts
-
-- "Create a bar chart of quarterly revenue"
-- "Show me a line chart of temperature over 12 months"
-- "What chart types are available?"
-- "Make a pie chart of market share by company"
-- "Create a heatmap of activity by day and hour"
+| Component | Technology |
+|-----------|-----------|
+| AI Agent Server | ASP.NET Core + Microsoft.Agents.AI (AGUI) |
+| LLM Provider | Groq (OpenAI-compatible) |
+| Chart Engine | Flint Chart MCP Server |
+| Frontend Framework | Next.js 16 + React 19 |
+| Chat UI | CopilotKit (Sidebar + Generative UI) |
+| Chart Rendering | Vega-Lite + Vega-Embed |
+| Protocol | AG-UI (Agent-User Interaction) |
 
 ## License
 
