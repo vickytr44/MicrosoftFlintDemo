@@ -30,6 +30,8 @@ public sealed class ChartInterceptingChatClient : DelegatingChatClient
             options.Tools = null;
         }
 
+        InterceptToolResults(messages);
+
         await foreach (var update in base.GetStreamingResponseAsync(messages, options, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
         {
             yield return update;
@@ -48,43 +50,48 @@ public sealed class ChartInterceptingChatClient : DelegatingChatClient
             options.Tools = null;
         }
 
-        var response = await base.GetResponseAsync(messages, options, cancellationToken);
+        InterceptToolResults(messages);
 
+        return await base.GetResponseAsync(messages, options, cancellationToken);
+    }
+
+    private void InterceptToolResults(IEnumerable<ChatMessage> messages)
+    {
         var messageList = messages.ToList();
-        
-        // Find the index of the last user prompt to only scan new messages in this turn
-        int lastUserIndex = messageList.FindLastIndex(m => m.Role == ChatRole.User);
-        
-        var lastUserPrompt = lastUserIndex >= 0 ? messageList[lastUserIndex].Text ?? "Generated Chart" : "Generated Chart";
-
-        // Scan only the messages appended after the last user prompt in the current turn
-        for (int i = lastUserIndex + 1; i < messageList.Count; i++)
+        if (messageList.Count > 0)
         {
-            var message = messageList[i];
-            if (message.Role == ChatRole.Assistant)
+            var lastMessage = messageList[^1];
+            if (lastMessage.Role == ChatRole.Tool)
             {
-                foreach (var content in message.Contents)
+                foreach (var content in lastMessage.Contents)
                 {
-                    if (content is FunctionCallContent call && IsChartTool(call.Name))
+                    if (content is FunctionResultContent result)
                     {
-                        // Find matching tool result in the messages list (also after lastUserIndex)
-                        var resultMessage = messageList.Skip(lastUserIndex + 1).FirstOrDefault(m => m.Role == ChatRole.Tool 
-                            && m.Contents.Any(c => c is FunctionResultContent r && r.CallId == call.CallId));
-                        
-                        var result = resultMessage?.Contents
-                            .OfType<FunctionResultContent>()
-                            .FirstOrDefault(r => r.CallId == call.CallId);
-
-                        if (result?.Result is not null)
+                        // Find the matching function call in the history
+                        for (int i = messageList.Count - 2; i >= 0; i--)
                         {
-                            TryProcessChartTool(lastUserPrompt, call, result.Result);
+                            var msg = messageList[i];
+                            if (msg.Role == ChatRole.Assistant)
+                            {
+                                var call = msg.Contents
+                                    .OfType<FunctionCallContent>()
+                                    .FirstOrDefault(c => c.CallId == result.CallId);
+
+                                if (call is not null && IsChartTool(call.Name))
+                                {
+                                    // Find the last user prompt
+                                    int lastUserIndex = messageList.FindLastIndex(m => m.Role == ChatRole.User);
+                                    var lastUserPrompt = lastUserIndex >= 0 ? messageList[lastUserIndex].Text ?? "Generated Chart" : "Generated Chart";
+
+                                    TryProcessChartTool(lastUserPrompt, call, result.Result);
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-
-        return response;
     }
 
     private static bool IsChartTool(string name)
