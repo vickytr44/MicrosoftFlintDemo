@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 
@@ -17,11 +18,36 @@ public sealed class ChartInterceptingChatClient : DelegatingChatClient
         _stateManager = stateManager;
     }
 
+    public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        if (options is not null && options.ResponseFormat is not null)
+        {
+            // Clear tools when JSON mode/schema is requested, because some LLM providers (like Groq)
+            // do not allow combining response_format with tool/function calling.
+            options.Tools = null;
+        }
+
+        await foreach (var update in base.GetStreamingResponseAsync(messages, options, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            yield return update;
+        }
+    }
+
     public override async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        if (options is not null && options.ResponseFormat is not null)
+        {
+            // Clear tools when JSON mode/schema is requested, because some LLM providers (like Groq)
+            // do not allow combining response_format with tool/function calling.
+            options.Tools = null;
+        }
+
         var response = await base.GetResponseAsync(messages, options, cancellationToken);
 
         var messageList = messages.ToList();

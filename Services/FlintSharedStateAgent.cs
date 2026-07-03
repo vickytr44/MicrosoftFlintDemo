@@ -70,12 +70,15 @@ internal sealed class FlintSharedStateAgent : DelegatingAIAgent
             ChatOptions = chatRunOptions.ChatOptions.Clone(),
             AllowBackgroundResponses = chatRunOptions.AllowBackgroundResponses,
             ContinuationToken = chatRunOptions.ContinuationToken,
-            ChatClientFactory = chatRunOptions.ChatClientFactory,
+            ChatClientFactory = null, // Force using the constructor-passed client (our custom pipeline)
         };
 
         firstRunOptions.ChatOptions.ResponseFormat = ChatResponseFormat.ForJsonSchema<FlintStateSnapshot>(
             schemaName: "FlintStateSnapshot",
             schemaDescription: "A response containing the current list of generated charts");
+
+        // Clear tools using an empty list (not null) so the agent does not auto-append constructor tools during this run
+        firstRunOptions.ChatOptions.Tools = new List<AITool>();
 
         ChatMessage stateUpdateMessage = new(
             ChatRole.System,
