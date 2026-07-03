@@ -99,76 +99,16 @@ public static class HostingExtensions
             return new ApiKeyCredential(apiKey);
         });
 
-        // Chat client — configured for Groq with custom interceptor middleware
-        services.AddSingleton<IChatClient>(sp =>
-        {
-            var llmSettings = sp.GetRequiredService<IOptions<LlmSettings>>().Value;
-            var credential = sp.GetRequiredService<ApiKeyCredential>();
-            var chartProcessor = sp.GetRequiredService<IChartProcessor>();
+        // Chat Client Factory
+        services.AddSingleton<IChatClientFactory, FlintChatClientFactory>();
 
-            var clientOptions = new OpenAIClientOptions
-            {
-                Endpoint = new Uri(llmSettings.Endpoint)
-            };
+        // Chat client — configured via Chat Client Factory
+        services.AddSingleton<IChatClient>(sp => sp.GetRequiredService<IChatClientFactory>().CreateChatClient());
 
-            var openAiClient = new OpenAIClient(credential, clientOptions);
-
-            return openAiClient
-                .GetChatClient(llmSettings.Model)
-                .AsIChatClient()
-                .AsBuilder()
-                .UseFunctionInvocation()
-                .Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
-                .Build();
-        });
+        // Agent Initializer
+        services.AddSingleton<IAgentInitializer, FlintAgentInitializer>();
 
         return services;
-    }
-
-    /// <summary>
-    /// Connects to the MCP server, discovers tools, creates the AI Agent, and maps the AG-UI endpoint.
-    /// </summary>
-    public static async Task InitializeFlintAgentAsync(this WebApplication app)
-    {
-        var mcpService = app.Services.GetRequiredService<IMcpService>();
-        var chatClient = app.Services.GetRequiredService<IChatClient>();
-        var jsonOptions = JsonSerializerOptions.Default;
-
-        Console.WriteLine("⏳ Starting Flint Chart MCP server...");
-        var mcpTools = await mcpService.ConnectAsync();
-
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"✅ Connected! Found {mcpTools.Count} Flint chart tools:");
-        Console.ResetColor();
-        foreach (var tool in mcpTools)
-        {
-            var desc = tool.Description ?? "";
-            var truncated = desc.Length > 80 ? desc[..80] + "..." : desc;
-            Console.WriteLine($"   🔧 {tool.Name}: {truncated}");
-        }
-
-        // System prompt for the Flint Chart Agent
-        var promptProvider = app.Services.GetRequiredService<IPromptProvider>();
-
-        // Create the ChatClientAgent with the MCP tools
-        var chatClientAgent = new ChatClientAgent(
-            chatClient,
-            instructions: promptProvider.SystemPrompt,
-            name: "FlintChartAgent",
-            description: "A data visualization assistant that creates charts using the Flint chart system.",
-            tools: [.. mcpTools]);
-
-        // Wrap with shared-state for CopilotKit co-agent state synchronization
-        var stateManager = app.Services.GetRequiredService<IChartStateReader>();
-        var agent = new FlintSharedStateAgent(chatClientAgent, stateManager, jsonOptions);
-
-        // Map the AG-UI agent endpoint
-        app.MapAGUI("/agent", agent);
-
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("\n🚀 Flint Chart AGUI Server is running at http://localhost:5000/agent");
-        Console.WriteLine("   Connect CopilotKit frontend to this endpoint.");
-        Console.ResetColor();
     }
 
     private static bool IsPlaceholderOrEmpty(string? key)
