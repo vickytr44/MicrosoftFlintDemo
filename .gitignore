@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+appsettings.development.json
+appsettings.Development.json
+*.user
+
+# Frontend / Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors / OS
+.vs/
+.vscode/
+.idea/
+*.suo
+*.userosscache
+*.sln.docstates
+Thumbs.db
+ehthumbs.db
+Desktop.ini
