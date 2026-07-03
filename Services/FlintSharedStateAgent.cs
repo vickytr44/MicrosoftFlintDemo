@@ -8,32 +8,24 @@ using FlintChartAgent.Services.Abstractions;
 
 namespace FlintChartAgent.Services;
 
-public class ChartDataSnapshot
-{
-    [JsonPropertyName("id")]
-    public string Id { get; set; } = string.Empty;
+/// <summary>
+/// Positional record representing a single chart data snapshot for serialization.
+/// </summary>
+public record ChartDataSnapshot(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("timestamp")] string Timestamp,
+    [property: JsonPropertyName("prompt")] string Prompt,
+    [property: JsonPropertyName("flintSpec")] string FlintSpec,
+    [property: JsonPropertyName("compiledSpec")] string CompiledSpec,
+    [property: JsonPropertyName("backend")] string Backend = "vegalite"
+);
 
-    [JsonPropertyName("timestamp")]
-    public string Timestamp { get; set; } = string.Empty;
-
-    [JsonPropertyName("prompt")]
-    public string Prompt { get; set; } = string.Empty;
-
-    [JsonPropertyName("flintSpec")]
-    public string FlintSpec { get; set; } = string.Empty;
-
-    [JsonPropertyName("compiledSpec")]
-    public string CompiledSpec { get; set; } = string.Empty;
-
-    [JsonPropertyName("backend")]
-    public string Backend { get; set; } = "vegalite";
-}
-
-public class FlintStateSnapshot
-{
-    [JsonPropertyName("charts")]
-    public List<ChartDataSnapshot> Charts { get; set; } = [];
-}
+/// <summary>
+/// Positional record representing the aggregate state snapshot of charts.
+/// </summary>
+public record FlintStateSnapshot(
+    [property: JsonPropertyName("charts")] List<ChartDataSnapshot> Charts
+);
 
 internal sealed class FlintSharedStateAgent(
     AIAgent innerAgent,
@@ -62,18 +54,16 @@ internal sealed class FlintSharedStateAgent(
         {
             var currentCharts = stateManager.GetCharts();
 
-            var snapshot = new FlintStateSnapshot
-            {
-                Charts = currentCharts.Select(c => new ChartDataSnapshot
-                {
-                    Id = c.Id,
-                    Timestamp = c.Timestamp.ToString("o"),
-                    Prompt = c.Prompt,
-                    FlintSpec = c.FlintSpec.GetRawText(),
-                    CompiledSpec = c.CompiledSpec.GetRawText(),
-                    Backend = c.Backend
-                }).ToList()
-            };
+            var snapshot = new FlintStateSnapshot(
+                currentCharts.Select(c => new ChartDataSnapshot(
+                    c.Id,
+                    c.Timestamp.ToString("o"),
+                    c.Prompt,
+                    c.FlintSpec.GetRawText(),
+                    c.CompiledSpec.GetRawText(),
+                    c.Backend
+                )).ToList()
+            );
 
             byte[] stateBytes = JsonSerializer.SerializeToUtf8Bytes(
                 snapshot,
