@@ -295,6 +295,45 @@ body {
 
 .copilotKitSidebar,
 [data-copilotkit-sidebar] {
+  --background: var(--bg-secondary) !important;
+  --foreground: var(--text-primary) !important;
+  --card: var(--bg-secondary) !important;
+  --card-foreground: var(--text-primary) !important;
+  --popover: var(--bg-secondary) !important;
+  --popover-foreground: var(--text-primary) !important;
+  --primary: var(--accent) !important;
+  --primary-foreground: #ffffff !important;
+  --secondary: rgba(255, 255, 255, 0.05) !important;
+  --secondary-foreground: var(--text-primary) !important;
+  --muted: rgba(255, 255, 255, 0.05) !important;
+  --muted-foreground: var(--text-secondary) !important;
+  --accent: var(--accent) !important;
+  --accent-foreground: #ffffff !important;
+  --border: var(--border) !important;
+  --input: var(--border) !important;
+  --ring: var(--accent) !important;
+
+  /* Legacy and direct styling properties */
   --copilot-kit-background-color: var(--bg-secondary) !important;
   --copilot-kit-primary-color: var(--accent) !important;
+  --copilot-kit-color: var(--text-primary) !important;
 }
+
+/* Force specific elements in CopilotKit to be readable on dark background */
+.copilotKitSidebar *,
+[data-copilotkit-sidebar] * {
+  color: inherit;
+}
+
+/* Ensure prompt/input panel text is readable */
+.copilotKitSidebar textarea,
+[data-copilotkit-sidebar] textarea {
+  color: #000000 !important; /* Input text remains dark inside white bubble */
+}
+
+/* Welcome message custom container */
+.copilotKitSidebar .copilot-welcome-message,
+[data-copilotkit-sidebar] .copilot-welcome-message {
+  color: var(--text-primary) !important;
+}
+
