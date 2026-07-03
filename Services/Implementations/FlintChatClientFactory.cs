@@ -10,21 +10,12 @@ namespace FlintChartAgent.Services.Implementations;
 /// <summary>
 /// Factory that creates and configures the Flint Chart Agent's IChatClient.
 /// </summary>
-public sealed class FlintChatClientFactory : IChatClientFactory
+public sealed class FlintChatClientFactory(
+    IOptions<LlmSettings> llmSettings,
+    ApiKeyCredential credential,
+    IChartProcessor chartProcessor) : IChatClientFactory
 {
-    private readonly LlmSettings _llmSettings;
-    private readonly ApiKeyCredential _credential;
-    private readonly IChartProcessor _chartProcessor;
-
-    public FlintChatClientFactory(
-        IOptions<LlmSettings> llmSettings,
-        ApiKeyCredential credential,
-        IChartProcessor chartProcessor)
-    {
-        _llmSettings = llmSettings.Value;
-        _credential = credential;
-        _chartProcessor = chartProcessor;
-    }
+    private readonly LlmSettings _llmSettings = llmSettings.Value;
 
     public IChatClient CreateChatClient()
     {
@@ -33,14 +24,14 @@ public sealed class FlintChatClientFactory : IChatClientFactory
             Endpoint = new Uri(_llmSettings.Endpoint)
         };
 
-        var openAiClient = new OpenAIClient(_credential, clientOptions);
+        var openAiClient = new OpenAIClient(credential, clientOptions);
 
         return openAiClient
             .GetChatClient(_llmSettings.Model)
             .AsIChatClient()
             .AsBuilder()
             .UseFunctionInvocation()
-            .Use(inner => new ChartInterceptingChatClient(inner, _chartProcessor))
+            .Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
             .Build();
     }
 }

@@ -8,16 +8,10 @@ namespace FlintChartAgent.Services;
 /// Intercepts chat completions, checks for Flint Chart MCP tool executions,
 /// and delegates processing to the <see cref="IChartProcessor"/>.
 /// </summary>
-public sealed class ChartInterceptingChatClient : DelegatingChatClient
+public sealed class ChartInterceptingChatClient(
+    IChatClient innerClient,
+    IChartProcessor chartProcessor) : DelegatingChatClient(innerClient)
 {
-    private readonly IChartProcessor _chartProcessor;
-
-    public ChartInterceptingChatClient(IChatClient innerClient, IChartProcessor chartProcessor)
-        : base(innerClient)
-    {
-        _chartProcessor = chartProcessor;
-    }
-
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
@@ -77,13 +71,13 @@ public sealed class ChartInterceptingChatClient : DelegatingChatClient
                                     .OfType<FunctionCallContent>()
                                     .FirstOrDefault(c => c.CallId == result.CallId);
 
-                                if (call is not null && _chartProcessor.IsChartTool(call.Name))
+                                if (call is not null && chartProcessor.IsChartTool(call.Name))
                                 {
                                     // Find the last user prompt
                                     int lastUserIndex = messageList.FindLastIndex(m => m.Role == ChatRole.User);
                                     var lastUserPrompt = lastUserIndex >= 0 ? messageList[lastUserIndex].Text ?? "Generated Chart" : "Generated Chart";
 
-                                    _chartProcessor.ProcessToolCall(lastUserPrompt, call, result.Result);
+                                    chartProcessor.ProcessToolCall(lastUserPrompt, call, result.Result);
                                     break;
                                 }
                             }

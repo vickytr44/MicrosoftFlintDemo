@@ -9,21 +9,12 @@ namespace FlintChartAgent.Services;
 /// <summary>
 /// Orchestrates the interactive chat loop between the user, the LLM, and the Flint MCP tools.
 /// </summary>
-public sealed class AgentChatService
+public sealed class AgentChatService(
+    IChatClient chatClient,
+    ApiKeyCredential credential,
+    IPromptProvider promptProvider,
+    ILogger<AgentChatService> logger)
 {
-    private readonly IChatClient _chatClient;
-    private readonly ApiKeyCredential _credential;
-    private readonly ILogger<AgentChatService> _logger;
-    private readonly IPromptProvider _promptProvider;
-
-    public AgentChatService(IChatClient chatClient, ApiKeyCredential credential, IPromptProvider promptProvider, ILogger<AgentChatService> logger)
-    {
-        _chatClient = chatClient;
-        _credential = credential;
-        _promptProvider = promptProvider;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Runs the interactive chat loop until the user exits.
     /// </summary>
@@ -31,7 +22,7 @@ public sealed class AgentChatService
     {
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System, _promptProvider.SystemPrompt)
+            new(ChatRole.System, promptProvider.SystemPrompt)
         };
 
         var chatOptions = new ChatOptions
@@ -72,9 +63,9 @@ public sealed class AgentChatService
                     Console.WriteLine("   ⏳ Thinking...");
                     Console.ResetColor();
 
-                    _logger.LogDebug("Sending message to LLM with {ToolCount} tools available.", chatOptions.Tools?.Count);
+                    logger.LogDebug("Sending message to LLM with {ToolCount} tools available.", chatOptions.Tools?.Count);
 
-                    var response = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+                    var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
 
                     messages.AddRange(response.Messages);
 
@@ -99,7 +90,7 @@ public sealed class AgentChatService
 
                     if (!string.IsNullOrWhiteSpace(newKey))
                     {
-                        _credential.Update(newKey);
+                        credential.Update(newKey);
                         // Retrying next iteration of this inner loop...
                     }
                     else
@@ -110,7 +101,7 @@ public sealed class AgentChatService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error during chat completion.");
+                    logger.LogError(ex, "Error during chat completion.");
 
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"\n❌ Error: {ex.Message}");

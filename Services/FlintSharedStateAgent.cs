@@ -35,18 +35,10 @@ public class FlintStateSnapshot
     public List<ChartDataSnapshot> Charts { get; set; } = [];
 }
 
-internal sealed class FlintSharedStateAgent : DelegatingAIAgent
+internal sealed class FlintSharedStateAgent(
+    AIAgent innerAgent,
+    IChartStateReader stateManager) : DelegatingAIAgent(innerAgent)
 {
-    private readonly IChartStateReader _stateManager;
-    private readonly JsonSerializerOptions _jsonSerializerOptions;
-
-    public FlintSharedStateAgent(AIAgent innerAgent, IChartStateReader stateManager, JsonSerializerOptions jsonSerializerOptions)
-        : base(innerAgent)
-    {
-        _stateManager = stateManager;
-        _jsonSerializerOptions = jsonSerializerOptions;
-    }
-
     protected override Task<AgentResponse> RunCoreAsync(IEnumerable<ChatMessage> messages, AgentThread? thread = null, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
     {
         return RunStreamingAsync(messages, thread, options, cancellationToken).ToAgentResponseAsync(cancellationToken);
@@ -68,7 +60,7 @@ internal sealed class FlintSharedStateAgent : DelegatingAIAgent
         if (options is ChatClientAgentRunOptions { ChatOptions.AdditionalProperties: { } properties } &&
             properties.ContainsKey("ag_ui_state"))
         {
-            var currentCharts = _stateManager.GetCharts();
+            var currentCharts = stateManager.GetCharts();
 
             var snapshot = new FlintStateSnapshot
             {

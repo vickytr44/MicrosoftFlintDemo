@@ -10,24 +10,19 @@ namespace FlintChartAgent.Services;
 /// Manages the lifecycle of the Flint Chart MCP server connection.
 /// Implements <see cref="IMcpService"/> to cleanly shut down the MCP server process.
 /// </summary>
-public sealed class FlintMcpService : IMcpService
+public sealed class FlintMcpService(
+    IOptions<McpSettings> settings,
+    ILogger<FlintMcpService> logger) : IMcpService
 {
-    private readonly McpSettings _settings;
-    private readonly ILogger<FlintMcpService> _logger;
+    private readonly McpSettings _settings = settings.Value;
     private McpClient? _client;
-
-    public FlintMcpService(IOptions<McpSettings> settings, ILogger<FlintMcpService> logger)
-    {
-        _settings = settings.Value;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Establishes a connection to the Flint Chart MCP server and returns the discovered tools.
     /// </summary>
     public async Task<IList<McpClientTool>> ConnectAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Connecting to MCP server '{ServerName}' via {Command}...",
+        logger.LogInformation("Connecting to MCP server '{ServerName}' via {Command}...",
             _settings.ServerName, _settings.Command);
 
         var transport = new StdioClientTransport(new()
@@ -41,7 +36,7 @@ public sealed class FlintMcpService : IMcpService
 
         var tools = await _client.ListToolsAsync(cancellationToken: cancellationToken);
 
-        _logger.LogInformation("Connected to MCP server. Discovered {ToolCount} tools.", tools.Count);
+        logger.LogInformation("Connected to MCP server. Discovered {ToolCount} tools.", tools.Count);
 
         return tools;
     }
@@ -50,7 +45,7 @@ public sealed class FlintMcpService : IMcpService
     {
         if (_client is not null)
         {
-            _logger.LogInformation("Shutting down MCP server connection...");
+            logger.LogInformation("Shutting down MCP server connection...");
             await _client.DisposeAsync();
             _client = null;
         }
