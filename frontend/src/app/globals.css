@@ -295,6 +295,7 @@ body {
 
 .copilotKitSidebar,
 [data-copilotkit-sidebar] {
+  color: var(--text-primary) !important;
   --background: var(--bg-secondary) !important;
   --foreground: var(--text-primary) !important;
   --card: var(--bg-secondary) !important;
@@ -323,6 +324,39 @@ body {
 .copilotKitSidebar *,
 [data-copilotkit-sidebar] * {
   color: inherit;
+}
+
+/* Style user messages to be highly visible: purple bubble with white text */
+.copilotKitMessage.copilotKitUserMessage,
+[data-copilotkit-sidebar] .copilotKitMessage.copilotKitUserMessage,
+.copilotKitSidebar .copilotKitMessage.copilotKitUserMessage {
+  background-color: var(--accent) !important;
+  color: #ffffff !important;
+  border-radius: 16px !important;
+  padding: 10px 16px !important;
+  margin-left: auto !important;
+  max-width: 80% !important;
+  display: block !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+}
+
+.copilotKitMessage.copilotKitUserMessage *,
+[data-copilotkit-sidebar] .copilotKitMessage.copilotKitUserMessage *,
+.copilotKitSidebar .copilotKitMessage.copilotKitUserMessage * {
+  color: #ffffff !important;
+}
+
+/* Style assistant messages */
+.copilotKitAssistantMessage,
+[data-copilotkit-sidebar] .copilotKitAssistantMessage,
+.copilotKitSidebar .copilotKitAssistantMessage {
+  color: var(--text-primary) !important;
+}
+
+.copilotKitAssistantMessage *,
+[data-copilotkit-sidebar] .copilotKitAssistantMessage *,
+.copilotKitSidebar .copilotKitAssistantMessage * {
+  color: var(--text-primary) !important;
 }
 
 /* Ensure prompt/input panel text is readable */
