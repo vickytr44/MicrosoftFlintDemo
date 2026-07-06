@@ -58,6 +58,33 @@ internal sealed class FlintSharedStateAgent(
             yield break;
         }
 
+        // 1. Sync the incoming frontend state to our local ChartStateManager before the agent runs
+        try
+        {
+            var incomingSnapshot = JsonSerializer.Deserialize<FlintStateSnapshot>(state.GetRawText(), _jsonSerializerOptions);
+            if (incomingSnapshot?.Charts != null)
+            {
+                var charts = incomingSnapshot.Charts.Select(c => new ChartData
+                {
+                    Id = c.Id,
+                    Timestamp = DateTime.TryParse(c.Timestamp, out var dt) ? dt.ToUniversalTime() : DateTime.UtcNow,
+                    Prompt = c.Prompt,
+                    FlintSpec = JsonDocument.Parse(c.FlintSpec).RootElement.Clone(),
+                    CompiledSpec = JsonDocument.Parse(c.CompiledSpec).RootElement.Clone(),
+                    Backend = c.Backend
+                }).ToList();
+
+                if (_stateManager is ChartStateManager manager)
+                {
+                    manager.SyncCharts(charts);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Ignore state sync errors on startup
+        }
+
         var firstRunOptions = new ChatClientAgentRunOptions
         {
             ChatOptions = chatRunOptions.ChatOptions.Clone(),
@@ -66,17 +93,28 @@ internal sealed class FlintSharedStateAgent(
             ChatClientFactory = chatRunOptions.ChatClientFactory,
         };
 
-        // Configure JSON schema response format for structured state output
-        firstRunOptions.ChatOptions.ResponseFormat = ChatResponseFormat.ForJsonSchema<FlintStateSnapshot>(
-            schemaName: "FlintStateSnapshot",
-            schemaDescription: "A response containing the current list of charts");
-
+        // NOTE: We do NOT set ChatOptions.ResponseFormat to ForJsonSchema here because Groq/Llama models 
+        // throw an HTTP 400 error when JSON mode is combined with tool/function calling.
+        // Instead, we instruct the model via prompt to return raw JSON matching the state schema.
         ChatMessage stateUpdateMessage = new(
             ChatRole.System,
             [
                 new TextContent("Here is the current state in JSON format:"),
                 new TextContent(state.GetRawText()),
-                new TextContent("The new state is:")
+                new TextContent("You must respond with the updated state in JSON format matching this schema:\n" +
+                               "{\n" +
+                               "  \"charts\": [\n" +
+                               "    {\n" +
+                               "      \"id\": \"string (guid)\",\n" +
+                               "      \"timestamp\": \"string (ISO 8601 UTC timestamp)\",\n" +
+                               "      \"prompt\": \"string\",\n" +
+                               "      \"flintSpec\": \"string (JSON-serialized Flint spec)\",\n" +
+                               "      \"compiledSpec\": \"string (JSON-serialized compiled Vega-Lite spec)\",\n" +
+                               "      \"backend\": \"vegalite\"\n" +
+                               "    }\n" +
+                               "  ]\n" +
+                               "}\n" +
+                               "Do not output any introductory or explanatory text. Output ONLY the JSON object. If you need to make changes, execute the appropriate tools first, and then return the updated state in JSON.")
             ]);
 
         var firstRunMessages = messages.Append(stateUpdateMessage);
@@ -85,18 +123,14 @@ internal sealed class FlintSharedStateAgent(
         await foreach (var update in InnerAgent.RunStreamingAsync(firstRunMessages, session, firstRunOptions, cancellationToken).ConfigureAwait(false))
         {
             allUpdates.Add(update);
-
-            // Yield all non-text updates (tool calls, etc.)
-            bool hasNonTextContent = update.Contents.Any(c => c is not TextContent);
-            if (hasNonTextContent)
-            {
-                yield return update;
-            }
+            yield return update; // Yield all updates to keep connection alive during LLM generation
         }
 
         var response = allUpdates.ToAgentResponse();
+        JsonElement stateSnapshot;
+        bool stateChanged = false;
 
-        if (FlintStateSerializer.TryDeserialize(response, out JsonElement stateSnapshot))
+        if (FlintStateSerializer.TryDeserialize(response, out stateSnapshot))
         {
             byte[] stateBytes = JsonSerializer.SerializeToUtf8Bytes(
                 stateSnapshot,
@@ -105,28 +139,35 @@ internal sealed class FlintSharedStateAgent(
             {
                 Contents = [new DataContent(stateBytes, "application/json")]
             };
+
+            stateChanged = FlintStateComparer.ChartsChanged(state, stateSnapshot);
         }
         else
         {
             yield break;
         }
 
-        // ✅ detect whether the state actually changed
-        bool stateChanged = FlintStateComparer.ChartsChanged(state, stateSnapshot);
-
-        // ✅ Only narrate if something changed
-        var summaryMessage = new ChatMessage(
-                ChatRole.System,
-                [new TextContent("Please provide a concise summary about the latest change in at most two sentences.")]);
-
-        var secondRunMessages = messages.Concat(response.Messages);
-
+        // Skip a second LLM round-trip for narration — build a concise summary
+        // directly from the current service state instead. This eliminates the
+        // second slow LLM call and prevents BodyTimeoutError on the proxy stream.
         if (stateChanged)
-            secondRunMessages = secondRunMessages.Append(summaryMessage);
-
-        await foreach (var update in InnerAgent.RunStreamingAsync(secondRunMessages, session, options, cancellationToken).ConfigureAwait(false))
         {
-            yield return update;
+            var currentCharts = _stateManager.GetCharts().ToList();
+            string summaryText;
+            if (currentCharts.Count > 0)
+            {
+                var lastChart = currentCharts[^1];
+                summaryText = $"I've successfully generated the chart for: \"{lastChart.Prompt}\" using the {lastChart.Backend} backend.";
+            }
+            else
+            {
+                summaryText = "The chart state was updated.";
+            }
+
+            yield return new AgentResponseUpdate
+            {
+                Contents = [new TextContent(summaryText)]
+            };
         }
     }
 }

@@ -68,4 +68,14 @@ public sealed class ChartStateManager : IChartStateManager
 
         OnChartAdded?.Invoke(newChart);
     }
+
+    public void SyncCharts(List<ChartData> charts)
+    {
+        _charts.Clear();
+        foreach (var chart in charts)
+        {
+            _charts.Enqueue(chart);
+        }
+    }
 }
+

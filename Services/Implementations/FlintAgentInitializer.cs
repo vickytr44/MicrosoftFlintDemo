@@ -1,9 +1,6 @@
-using System.Linq;
-using System.Text.Json;
-using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Mcp;
-using Microsoft.Extensions.AI;
 using FlintChartAgent.Services.Abstractions;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 
 namespace FlintChartAgent.Services.Implementations;
 
@@ -59,7 +56,7 @@ public sealed class FlintAgentInitializer(
             Description = "A data visualization assistant that creates charts using the Flint chart system.",
             ChatOptions = new()
             {
-                Instructions = promptProvider.SystemPrompt,
+                //Instructions = promptProvider.SystemPrompt,
                 Tools = [.. mcpTools]
             }
         };

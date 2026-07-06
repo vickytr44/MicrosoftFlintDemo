@@ -30,6 +30,23 @@ internal static class FlintStateSerializer
             return false;
         }
 
+        // Clean up markdown wrappers (e.g. ```json ... ```)
+        textContent = textContent.Trim();
+        if (textContent.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
+        {
+            textContent = textContent.Substring(7);
+        }
+        else if (textContent.StartsWith("```", StringComparison.OrdinalIgnoreCase))
+        {
+            textContent = textContent.Substring(3);
+        }
+
+        if (textContent.EndsWith("```", StringComparison.OrdinalIgnoreCase))
+        {
+            textContent = textContent.Substring(0, textContent.Length - 3);
+        }
+        textContent = textContent.Trim();
+
         try
         {
             using var doc = JsonDocument.Parse(textContent);
