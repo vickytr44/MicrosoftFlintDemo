@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
@@ -11,7 +12,8 @@ namespace FlintChartAgent.Services;
 /// </summary>
 public sealed class ChartInterceptingChatClient(
     IChatClient innerClient,
-    IChartProcessor chartProcessor) : DelegatingChatClient(innerClient)
+    IChartProcessor chartProcessor,
+    ChartStateManager stateManager) : DelegatingChatClient(innerClient)
 {
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -81,6 +83,18 @@ public sealed class ChartInterceptingChatClient(
                                     var lastUserPrompt = lastUserIndex >= 0 ? messageList[lastUserIndex].Text ?? "Generated Chart" : "Generated Chart";
 
                                     await chartProcessor.ProcessToolCallAsync(lastUserPrompt, call, result.Result);
+
+                                    // Overwrite the tool result content for create_chart_view so frontend displays the compiled spec
+                                    if (call.Name == "create_chart_view")
+                                    {
+                                        var charts = stateManager.GetCharts();
+                                        var lastChart = charts.LastOrDefault();
+                                        if (lastChart != null)
+                                        {
+                                            result.Result = lastChart.CompiledSpec.GetRawText();
+                                            Console.WriteLine("[FLINT DEBUG] ChartInterceptingChatClient: Overriding create_chart_view tool result with compiled spec.");
+                                        }
+                                    }
                                     break;
                                 }
                             }

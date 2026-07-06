@@ -48,6 +48,30 @@ export function ChartCard({ args, result, status }: ChartCardProps) {
 
     if (!vegaSpec) return;
 
+    // Auto-enrich the Vega-Lite spec to ensure interactivity (tooltips & zoom/pan scales)
+    if (vegaSpec) {
+      // 1. Enable standard tooltips on the mark
+      if (vegaSpec.mark) {
+        if (typeof vegaSpec.mark === "string") {
+          vegaSpec.mark = { type: vegaSpec.mark, tooltip: true };
+        } else if (typeof vegaSpec.mark === "object" && vegaSpec.mark !== null) {
+          (vegaSpec.mark as any).tooltip = true;
+        }
+      }
+
+      // 2. Enable zoom/pan via scales binding for non-arc charts
+      const isArc = vegaSpec.mark === "arc" || (typeof vegaSpec.mark === "object" && vegaSpec.mark !== null && (vegaSpec.mark as any).type === "arc");
+      if (!isArc && !vegaSpec.params) {
+        vegaSpec.params = [
+          {
+            name: "grid",
+            select: "interval",
+            bind: "scales"
+          }
+        ];
+      }
+    }
+
     // Dynamically import vega-embed to avoid SSR issues
     import("vega-embed").then(({ default: vegaEmbed }) => {
       if (!chartRef.current) return;

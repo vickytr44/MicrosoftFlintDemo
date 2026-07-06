@@ -14,7 +14,8 @@ public sealed class FlintChatClientFactory(
     IOptions<LlmSettings> llmSettings,
     ApiKeyCredential credential,
     ILoggerFactory loggerFactory,
-    IChartProcessor chartProcessor) : IChatClientFactory
+    IChartProcessor chartProcessor,
+    ChartStateManager chartStateManager) : IChatClientFactory
 {
     private readonly LlmSettings _llmSettings = llmSettings.Value;
 
@@ -37,7 +38,7 @@ public sealed class FlintChatClientFactory(
             })
             .UseLogging(loggerFactory)
             .UseFunctionInvocation(loggerFactory)
-            .Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
+            .Use(inner => new ChartInterceptingChatClient(inner, chartProcessor, chartStateManager))
             .Build();
     }
 }
