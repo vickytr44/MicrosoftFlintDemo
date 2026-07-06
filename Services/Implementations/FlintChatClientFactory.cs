@@ -37,7 +37,7 @@ public sealed class FlintChatClientFactory(
             })
             .UseLogging(loggerFactory)
             .UseFunctionInvocation(loggerFactory)
-            //.Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
+            .Use(inner => new ChartInterceptingChatClient(inner, chartProcessor))
             .Build();
     }
 }

@@ -15,12 +15,14 @@ public abstract class BaseChartToolHandler : IChartToolHandler
     {
         try
         {
+            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.Process: Entered for tool '{call.Name}'. Prompt: '{prompt}'");
             var argsJson = JsonSerializer.Serialize(call.Arguments);
             using var doc = JsonDocument.Parse(argsJson);
             var root = doc.RootElement;
 
             if (root.ValueKind != JsonValueKind.Object)
             {
+                Console.WriteLine("[FLINT DEBUG] BaseChartToolHandler.Process: Root arguments are not a JSON object.");
                 return;
             }
 
@@ -47,6 +49,7 @@ public abstract class BaseChartToolHandler : IChartToolHandler
 
             if (target.ValueKind != JsonValueKind.Object)
             {
+                Console.WriteLine("[FLINT DEBUG] BaseChartToolHandler.Process: Spec/target is not a JSON object.");
                 return;
             }
 
@@ -68,6 +71,7 @@ public abstract class BaseChartToolHandler : IChartToolHandler
             var flintSpecJson = JsonSerializer.SerializeToElement(specObj);
             var compiledSpecJson = ProcessResult(flintSpecJson, result);
 
+            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.Process: Calling stateWriter.AddChart for backend: {backend}");
             stateWriter.AddChart(prompt, flintSpecJson, compiledSpecJson, backend);
         }
         catch (Exception ex)

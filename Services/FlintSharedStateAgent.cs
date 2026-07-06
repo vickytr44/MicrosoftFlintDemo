@@ -65,6 +65,7 @@ internal sealed class FlintSharedStateAgent(
         try
         {
             var incomingSnapshot = JsonSerializer.Deserialize<FlintStateSnapshot>(state.GetRawText(), _jsonSerializerOptions);
+            Console.WriteLine($"[FLINT DEBUG] FlintSharedStateAgent: Incoming state contains {incomingSnapshot?.Charts?.Count ?? 0} charts.");
             if (incomingSnapshot?.Charts != null)
             {
                 var charts = incomingSnapshot.Charts.Select(c => {
@@ -97,12 +98,14 @@ internal sealed class FlintSharedStateAgent(
 
                 if (_stateManager is ChartStateManager manager)
                 {
+                    Console.WriteLine($"[FLINT DEBUG] FlintSharedStateAgent: Syncing {charts.Count} charts to Manager");
                     manager.SyncCharts(charts);
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[FLINT DEBUG] FlintSharedStateAgent: State sync failed: {ex.Message}");
             // Ignore state sync errors on startup
         }
 
@@ -142,6 +145,7 @@ internal sealed class FlintSharedStateAgent(
 
         // Build and send the updated state snapshot from the local state manager
         var currentCharts = _stateManager.GetCharts();
+        Console.WriteLine($"[FLINT DEBUG] FlintSharedStateAgent: Finished LLM run. Current store chart count = {currentCharts.Count}. Serializing snapshot...");
         var snapshot = new FlintStateSnapshot(
             currentCharts.Select(c => new ChartDataSnapshot(
                 c.Id,

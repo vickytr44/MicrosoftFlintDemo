@@ -25,10 +25,16 @@ public sealed class ChartStateManager : IChartStateManager
 
     public event Action<ChartData>? OnChartAdded;
 
-    public IReadOnlyCollection<ChartData> GetCharts() => _charts.ToArray();
+    public IReadOnlyCollection<ChartData> GetCharts()
+    {
+        var charts = _charts.ToArray();
+        Console.WriteLine($"[FLINT DEBUG] ChartStateManager.GetCharts: Returning {charts.Length} charts.");
+        return charts;
+    }
 
     public void AddChart(string prompt, JsonElement flintSpec, JsonElement compiledSpec, string backend)
     {
+        Console.WriteLine($"[FLINT DEBUG] ChartStateManager.AddChart: Adding chart with prompt '{prompt}'");
         // Prevent duplicate specifications for the same prompt
         var chartsList = _charts.ToArray();
         if (chartsList.Length > 0)
@@ -43,8 +49,13 @@ public sealed class ChartStateManager : IChartStateManager
                 
                 if (isLastSpecRaw && isNewSpecCompiled)
                 {
+                    Console.WriteLine("[FLINT DEBUG] ChartStateManager.AddChart: Upgrading last chart with compiled spec");
                     lastChart.CompiledSpec = compiledSpec;
                     lastChart.Backend = backend;
+                }
+                else
+                {
+                    Console.WriteLine("[FLINT DEBUG] ChartStateManager.AddChart: Duplicate prompt and spec detected. Skipping add.");
                 }
                 return;
             }
@@ -59,6 +70,7 @@ public sealed class ChartStateManager : IChartStateManager
         };
 
         _charts.Enqueue(newChart);
+        Console.WriteLine($"[FLINT DEBUG] ChartStateManager.AddChart: Enqueued new chart. Total count in store: {_charts.Count}");
 
         // Keep history bounded
         while (_charts.Count > MaxHistory)
