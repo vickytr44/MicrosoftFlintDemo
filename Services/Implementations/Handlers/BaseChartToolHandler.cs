@@ -69,7 +69,67 @@ public abstract class BaseChartToolHandler : IChartToolHandler
             if (chartSpec.ValueKind != JsonValueKind.Undefined) specObj["chart_spec"] = chartSpec;
 
             var flintSpecJson = JsonSerializer.SerializeToElement(specObj);
-            var compiledSpecJson = await ProcessResultAsync(flintSpecJson, result);
+            var compiledSpecJson = await ProcessResultAsync(flintSpecJson, result, prompt);
+
+            // Mutate compiled spec to inject zoom/pan params if it is a supported continuous chart type
+            string chartType = "";
+            if (flintSpecJson.TryGetProperty("chart_spec", out var chartSpecProp) &&
+                chartSpecProp.TryGetProperty("chartType", out var typeProp))
+            {
+                chartType = typeProp.GetString() ?? "";
+            }
+            
+            bool supportsZoom = chartType == "Line Chart" || chartType == "Scatter Plot" || chartType == "Area Chart" || chartType == "Sparkline";
+            if (supportsZoom)
+            {
+                try
+                {
+                    var compiledSpecStr = compiledSpecJson.GetRawText();
+                    using var tempDoc = JsonDocument.Parse(compiledSpecStr);
+                    var targetElement = tempDoc.RootElement;
+                    bool hasSpecWrapper = targetElement.TryGetProperty("spec", out var nestedSpec);
+                    var specToMutate = hasSpecWrapper ? nestedSpec : targetElement;
+                    
+                    if (specToMutate.ValueKind == JsonValueKind.Object && !specToMutate.TryGetProperty("params", out _))
+                    {
+                        var specNode = System.Text.Json.Nodes.JsonNode.Parse(specToMutate.GetRawText());
+                        if (specNode is System.Text.Json.Nodes.JsonObject specObjMutated)
+                        {
+                            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler: Injecting zoom/pan params for chart type '{chartType}'");
+                            var paramsArray = new System.Text.Json.Nodes.JsonArray
+                            {
+                                new System.Text.Json.Nodes.JsonObject
+                                {
+                                    ["name"] = "grid",
+                                    ["select"] = "interval",
+                                    ["bind"] = "scales"
+                                }
+                            };
+                            specObjMutated["params"] = paramsArray;
+                            
+                            if (hasSpecWrapper)
+                            {
+                                var outerNode = System.Text.Json.Nodes.JsonNode.Parse(compiledSpecStr) as System.Text.Json.Nodes.JsonObject;
+                                if (outerNode != null)
+                                {
+                                    outerNode["spec"] = specObjMutated;
+                                    using var mutatedDoc = JsonDocument.Parse(outerNode.ToJsonString());
+                                    compiledSpecJson = mutatedDoc.RootElement.Clone();
+                                }
+                            }
+                            else
+                            {
+                                using var mutatedDoc = JsonDocument.Parse(specObjMutated.ToJsonString());
+                                compiledSpecJson = mutatedDoc.RootElement.Clone();
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler: Zoom/pan injection failed: {ex.Message}");
+                }
+            }
 
             Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.ProcessAsync: Calling stateWriter.AddChart for backend: {backend}");
             stateWriter.AddChart(prompt, flintSpecJson, compiledSpecJson, backend);
@@ -85,7 +145,7 @@ public abstract class BaseChartToolHandler : IChartToolHandler
     /// <summary>
     /// Processes the tool execution result and returns the compiled chart specification.
     /// </summary>
-    protected virtual Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result)
+    protected virtual Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
     {
         return Task.FromResult(flintSpec);
     }

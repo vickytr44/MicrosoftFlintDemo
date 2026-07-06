@@ -9,7 +9,7 @@ public sealed class CompileChartToolHandler : BaseChartToolHandler
 {
     public override bool CanHandle(string toolName) => toolName == "compile_chart";
 
-    protected override Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result)
+    protected override Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
     {
         if (result is string resultStr)
         {

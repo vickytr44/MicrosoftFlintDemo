@@ -16,7 +16,7 @@ public sealed class CreateChartViewToolHandler(IMcpService mcpService) : BaseCha
 
     public override bool CanHandle(string toolName) => toolName == "create_chart_view";
 
-    protected override async Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result)
+    protected override async Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
     {
         if (_mcpService.Client == null)
         {

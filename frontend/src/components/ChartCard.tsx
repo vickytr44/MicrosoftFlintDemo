@@ -47,36 +47,29 @@ export function ChartCard({ args, result, status }: ChartCardProps) {
     }
 
     if (!vegaSpec) return;
+    const spec = vegaSpec;
 
     // Auto-enrich the Vega-Lite spec to ensure interactivity (tooltips & zoom/pan scales)
-    if (vegaSpec) {
-      // 1. Enable standard tooltips on the mark
-      if (vegaSpec.mark) {
-        if (typeof vegaSpec.mark === "string") {
-          vegaSpec.mark = { type: vegaSpec.mark, tooltip: true };
-        } else if (typeof vegaSpec.mark === "object" && vegaSpec.mark !== null) {
-          (vegaSpec.mark as any).tooltip = true;
-        }
-      }
-
-      // 2. Enable zoom/pan via scales binding for non-arc charts
-      const isArc = vegaSpec.mark === "arc" || (typeof vegaSpec.mark === "object" && vegaSpec.mark !== null && (vegaSpec.mark as any).type === "arc");
-      if (!isArc && !vegaSpec.params) {
-        vegaSpec.params = [
-          {
-            name: "grid",
-            select: "interval",
-            bind: "scales"
-          }
-        ];
+    // 1. Enable standard tooltips on the mark
+    if (spec.mark) {
+      if (typeof spec.mark === "string") {
+        spec.mark = { type: spec.mark, tooltip: true };
+      } else if (typeof spec.mark === "object" && spec.mark !== null) {
+        (spec.mark as any).tooltip = true;
       }
     }
 
+    const isArc = spec.mark === "arc" || (typeof spec.mark === "object" && spec.mark !== null && (spec.mark as any).type === "arc");
+
+    // 2. Make non-arc charts responsive to parent container width
+    if (!isArc) {
+      spec.width = "container";
+    }
     // Dynamically import vega-embed to avoid SSR issues
     import("vega-embed").then(({ default: vegaEmbed }) => {
       if (!chartRef.current) return;
 
-      vegaEmbed(chartRef.current, vegaSpec as any, {
+      vegaEmbed(chartRef.current, spec as any, {
         theme: "dark",
         actions: false,
         renderer: "svg",
@@ -104,7 +97,7 @@ export function ChartCard({ args, result, status }: ChartCardProps) {
         }
       });
     });
-  }, [status, result, args, prompt]);
+  }, [status, result, args]);
 
   if (status === "inProgress" || status === "executing") {
     const chartType = getChartType(args);
