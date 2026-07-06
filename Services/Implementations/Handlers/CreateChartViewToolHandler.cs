@@ -16,13 +16,16 @@ public sealed class CreateChartViewToolHandler(IMcpService mcpService) : BaseCha
 
     public override bool CanHandle(string toolName) => toolName == "create_chart_view";
 
-    protected override async Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
+    protected override async Task<(JsonElement CompiledSpec, string? AppHtml)> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
     {
         if (_mcpService.Client == null)
         {
             Console.WriteLine("[FLINT DEBUG] CreateChartViewToolHandler: MCP client is not connected. Returning raw Flint spec.");
-            return flintSpec;
+            return (flintSpec, null);
         }
+
+        JsonElement compiledSpec = flintSpec;
+        string? appHtml = null;
 
         try
         {
@@ -45,10 +48,12 @@ public sealed class CreateChartViewToolHandler(IMcpService mcpService) : BaseCha
                         if (doc.RootElement.TryGetProperty("spec", out var specProp))
                         {
                             Console.WriteLine("[FLINT DEBUG] CreateChartViewToolHandler: Found nested 'spec' property. Extracting it.");
-                            return specProp.Clone();
+                            compiledSpec = specProp.Clone();
                         }
-                        
-                        return doc.RootElement.Clone();
+                        else
+                        {
+                            compiledSpec = doc.RootElement.Clone();
+                        }
                     }
                 }
             }
@@ -60,7 +65,26 @@ public sealed class CreateChartViewToolHandler(IMcpService mcpService) : BaseCha
             Console.ResetColor();
         }
 
-        Console.WriteLine("[FLINT DEBUG] CreateChartViewToolHandler: Fallback, returning raw Flint spec.");
-        return flintSpec;
+        try
+        {
+            Console.WriteLine("[FLINT DEBUG] CreateChartViewToolHandler: Reading MCP app resource...");
+            var resourceResult = await _mcpService.Client.ReadResourceAsync("ui://flint-chart/chart-view.html");
+            if (resourceResult?.Contents != null && resourceResult.Contents.Count > 0)
+            {
+                if (resourceResult.Contents[0] is TextResourceContents textContent)
+                {
+                    appHtml = textContent.Text;
+                    Console.WriteLine($"[FLINT DEBUG] CreateChartViewToolHandler: Read app UI HTML ({appHtml?.Length ?? 0} chars)");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[FLINT DEBUG] CreateChartViewToolHandler: Exception during ReadResourceAsync: {ex.Message}");
+            Console.ResetColor();
+        }
+
+        return (compiledSpec, appHtml);
     }
 }

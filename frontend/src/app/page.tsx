@@ -67,11 +67,26 @@ function DashboardContent() {
     useRenderToolCall({
       name: toolName,
       render: ({ args, status, result }: { args: Record<string, unknown>; status: string; result?: unknown }) => {
+        // Find matching appHtml from co-agent state if complete
+        let appHtml: string | undefined = undefined;
+        if (status === "complete" && state?.charts) {
+          const matchingChart = state.charts.find(c => {
+            try {
+              const spec = typeof c.flintSpec === "string" ? JSON.parse(c.flintSpec) : c.flintSpec;
+              return JSON.stringify(spec) === JSON.stringify(args);
+            } catch {
+              return false;
+            }
+          });
+          appHtml = matchingChart?.appHtml;
+        }
+
         return (
           <ChartCard
             args={args}
             status={status as "inProgress" | "executing" | "complete"}
             result={result}
+            appHtml={appHtml}
           />
         );
       },
@@ -146,6 +161,7 @@ function DashboardContent() {
                     args={flintArgs as Record<string, unknown>}
                     status="complete"
                     result={compiledSpec}
+                    appHtml={chart.appHtml}
                   />
                 </div>
               );

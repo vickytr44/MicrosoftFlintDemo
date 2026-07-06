@@ -12,6 +12,7 @@ public sealed class ChartData
     public JsonElement FlintSpec { get; set; }
     public JsonElement CompiledSpec { get; set; }
     public string Backend { get; set; } = "vegalite";
+    public string? AppHtml { get; set; }
 }
 
 /// <summary>
@@ -32,7 +33,7 @@ public sealed class ChartStateManager : IChartStateManager
         return charts;
     }
 
-    public void AddChart(string prompt, JsonElement flintSpec, JsonElement compiledSpec, string backend)
+    public void AddChart(string prompt, JsonElement flintSpec, JsonElement compiledSpec, string backend, string? appHtml = null)
     {
         Console.WriteLine($"[FLINT DEBUG] ChartStateManager.AddChart: Adding chart with prompt '{prompt}'");
         // Prevent duplicate specifications for the same prompt
@@ -52,6 +53,10 @@ public sealed class ChartStateManager : IChartStateManager
                     Console.WriteLine("[FLINT DEBUG] ChartStateManager.AddChart: Upgrading last chart with compiled spec");
                     lastChart.CompiledSpec = compiledSpec;
                     lastChart.Backend = backend;
+                    if (appHtml != null)
+                    {
+                        lastChart.AppHtml = appHtml;
+                    }
                 }
                 else
                 {
@@ -66,7 +71,8 @@ public sealed class ChartStateManager : IChartStateManager
             Prompt = prompt,
             FlintSpec = flintSpec,
             CompiledSpec = compiledSpec,
-            Backend = backend
+            Backend = backend,
+            AppHtml = appHtml
         };
 
         _charts.Enqueue(newChart);

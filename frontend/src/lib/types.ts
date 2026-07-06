@@ -13,4 +13,5 @@ export type ChartData = {
   flintSpec: string;
   compiledSpec: string;
   backend: string;
+  appHtml?: string;
 };

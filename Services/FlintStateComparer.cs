@@ -79,6 +79,13 @@ internal static class FlintStateComparer
             {
                 return true;
             }
+
+            oldChart.TryGetProperty("appHtml", out var oldAppHtml);
+            newChart.TryGetProperty("appHtml", out var newAppHtml);
+            if (GetRawOrString(oldAppHtml) != GetRawOrString(newAppHtml))
+            {
+                return true;
+            }
         }
 
         return false; // No change

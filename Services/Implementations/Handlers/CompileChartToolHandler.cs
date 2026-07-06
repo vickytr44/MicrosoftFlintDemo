@@ -9,20 +9,20 @@ public sealed class CompileChartToolHandler : BaseChartToolHandler
 {
     public override bool CanHandle(string toolName) => toolName == "compile_chart";
 
-    protected override Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
+    protected override Task<(JsonElement CompiledSpec, string? AppHtml)> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
     {
         if (result is string resultStr)
         {
             try
             {
                 using var resultDoc = JsonDocument.Parse(resultStr);
-                return Task.FromResult(resultDoc.RootElement.Clone());
+                return Task.FromResult<(JsonElement, string?)>((resultDoc.RootElement.Clone(), null));
             }
             catch
             {
-                return Task.FromResult(JsonSerializer.SerializeToElement(result));
+                return Task.FromResult<(JsonElement, string?)>((JsonSerializer.SerializeToElement(result), null));
             }
         }
-        return Task.FromResult(JsonSerializer.SerializeToElement(result));
+        return Task.FromResult<(JsonElement, string?)>((JsonSerializer.SerializeToElement(result), null));
     }
 }

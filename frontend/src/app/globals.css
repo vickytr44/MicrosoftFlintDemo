@@ -370,3 +370,20 @@ body {
   color: var(--text-primary) !important;
 }
 
+/* ─────────────── Chart App Container (iframe) ─────────────── */
+
+.chart-app-container {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  background: #1e1e24;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: height 0.2s ease;
+}
+
+.chart-card.app-view {
+  max-width: 100%;
+}
+

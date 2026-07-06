@@ -9,17 +9,75 @@ interface ChartCardProps {
   result?: unknown;
   /** The current status of the tool call */
   status: "inProgress" | "executing" | "complete";
+  /** Optional appHtml string */
+  appHtml?: string;
 }
 
 /**
  * Renders a Vega-Lite chart from Flint tool call arguments.
  * Used as Generative UI inside the CopilotKit chat sidebar.
  */
-export function ChartCard({ args, result, status }: ChartCardProps) {
+export function ChartCard({ args, result, status, appHtml }: ChartCardProps) {
   const chartRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Handle postMessage handshake for the MCP App iframe if appHtml is present
+  useEffect(() => {
+    if (!appHtml || status !== "complete") return;
+
+    const handleMessage = (event: MessageEvent) => {
+      const iframe = iframeRef.current;
+      if (!iframe || event.source !== iframe.contentWindow) return;
+
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.method === "ui/initialize") {
+        console.log("[FLINT UI] Received ui/initialize from iframe", data);
+        iframe.contentWindow?.postMessage({
+          jsonrpc: "2.0",
+          id: data.id,
+          result: {
+            protocolVersion: data.params?.protocolVersion || "2026-01-26",
+            hostInfo: { name: "FlintDashboard", version: "1.0.0" },
+            hostCapabilities: {
+              openLinks: {},
+              downloadFile: {}
+            },
+            hostContext: {
+              theme: "dark",
+              displayMode: "inline"
+            }
+          }
+        }, "*");
+      } 
+      else if (data.method === "ui/notifications/initialized") {
+        console.log("[FLINT UI] Iframe initialized. Sending tool input:", args);
+        iframe.contentWindow?.postMessage({
+          jsonrpc: "2.0",
+          method: "ui/notifications/tool-input",
+          params: {
+            arguments: args
+          }
+        }, "*");
+      }
+      else if (data.method === "ui/notifications/size-changed") {
+        const height = data.params?.height;
+        if (height) {
+          console.log("[FLINT UI] Size changed from iframe, setting height:", height);
+          iframe.style.height = `${height + 20}px`; // Add small padding for scrollbars
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [appHtml, status, args]);
 
   useEffect(() => {
-    if (status !== "complete" || !chartRef.current) return;
+    if (status !== "complete" || appHtml || !chartRef.current) return;
 
     // Try to parse the compiled spec from the result
     let vegaSpec: Record<string, unknown> | null = null;
@@ -113,6 +171,26 @@ export function ChartCard({ args, result, status }: ChartCardProps) {
 
   if (status === "complete") {
     const chartType = getChartType(args);
+
+    if (appHtml) {
+      return (
+        <div className="chart-card app-view" style={{ margin: "4px 0" }}>
+          <div className="chart-card-header">
+            <span className="chart-card-title">{chartType}</span>
+            <span className="chart-card-badge">flint-app</span>
+          </div>
+          <div className="chart-app-container">
+            <iframe
+              ref={iframeRef}
+              sandbox="allow-scripts allow-popups"
+              style={{ width: "100%", height: "450px", border: "none", display: "block" }}
+              srcDoc={appHtml}
+            />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="chart-card" style={{ margin: "4px 0" }}>
         <div className="chart-card-header">

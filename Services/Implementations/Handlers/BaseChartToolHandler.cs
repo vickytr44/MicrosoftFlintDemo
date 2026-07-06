@@ -69,7 +69,7 @@ public abstract class BaseChartToolHandler : IChartToolHandler
             if (chartSpec.ValueKind != JsonValueKind.Undefined) specObj["chart_spec"] = chartSpec;
 
             var flintSpecJson = JsonSerializer.SerializeToElement(specObj);
-            var compiledSpecJson = await ProcessResultAsync(flintSpecJson, result, prompt);
+            var (compiledSpecJson, appHtml) = await ProcessResultAsync(flintSpecJson, result, prompt);
 
             // Mutate compiled spec to inject zoom/pan params if it is a supported continuous chart type
             string chartType = "";
@@ -132,7 +132,7 @@ public abstract class BaseChartToolHandler : IChartToolHandler
             }
 
             Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.ProcessAsync: Calling stateWriter.AddChart for backend: {backend}");
-            stateWriter.AddChart(prompt, flintSpecJson, compiledSpecJson, backend);
+            stateWriter.AddChart(prompt, flintSpecJson, compiledSpecJson, backend, appHtml);
         }
         catch (Exception ex)
         {
@@ -143,10 +143,10 @@ public abstract class BaseChartToolHandler : IChartToolHandler
     }
 
     /// <summary>
-    /// Processes the tool execution result and returns the compiled chart specification.
+    /// Processes the tool execution result and returns the compiled chart specification and optional app UI HTML.
     /// </summary>
-    protected virtual Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
+    protected virtual Task<(JsonElement CompiledSpec, string? AppHtml)> ProcessResultAsync(JsonElement flintSpec, object? result, string prompt)
     {
-        return Task.FromResult(flintSpec);
+        return Task.FromResult<(JsonElement, string?)>((flintSpec, null));
     }
 }

@@ -20,7 +20,8 @@ public record ChartDataSnapshot(
     [property: JsonPropertyName("prompt")] string Prompt,
     [property: JsonPropertyName("flintSpec")] string FlintSpec,
     [property: JsonPropertyName("compiledSpec")] string CompiledSpec,
-    [property: JsonPropertyName("backend")] string Backend = "vegalite"
+    [property: JsonPropertyName("backend")] string Backend = "vegalite",
+    [property: JsonPropertyName("appHtml")] string? AppHtml = null
 );
 
 /// <summary>
@@ -92,7 +93,8 @@ internal sealed class FlintSharedStateAgent(
                         Prompt = c.Prompt,
                         FlintSpec = flintSpecElement,
                         CompiledSpec = compiledSpecElement,
-                        Backend = c.Backend
+                        Backend = c.Backend,
+                        AppHtml = c.AppHtml
                     };
                 }).ToList();
 
@@ -153,7 +155,8 @@ internal sealed class FlintSharedStateAgent(
                 c.Prompt,
                 SafeGetRawText(c.FlintSpec),
                 SafeGetRawText(c.CompiledSpec),
-                c.Backend
+                c.Backend,
+                c.AppHtml
             )).ToList()
         );
 

@@ -7,5 +7,5 @@ namespace FlintChartAgent.Services.Abstractions;
 /// </summary>
 public interface IChartStateWriter
 {
-    void AddChart(string prompt, JsonElement flintSpec, JsonElement compiledSpec, string backend);
+    void AddChart(string prompt, JsonElement flintSpec, JsonElement compiledSpec, string backend, string? appHtml = null);
 }
