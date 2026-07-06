@@ -37,6 +37,8 @@ export function ChartCard({ args, result, status }: ChartCardProps) {
     // If the result contains a nested compiledSpec or spec
     if (vegaSpec && "compiledSpec" in vegaSpec) {
       vegaSpec = vegaSpec.compiledSpec as Record<string, unknown>;
+    } else if (vegaSpec && "spec" in vegaSpec) {
+      vegaSpec = vegaSpec.spec as Record<string, unknown>;
     }
 
     // If we still don't have a valid vega spec, try to build one from the args
@@ -78,7 +80,7 @@ export function ChartCard({ args, result, status }: ChartCardProps) {
         }
       });
     });
-  }, [status, result, args]);
+  }, [status, result, args, prompt]);
 
   if (status === "inProgress" || status === "executing") {
     const chartType = getChartType(args);
@@ -131,7 +133,7 @@ function isVegaLikeSpec(obj: Record<string, unknown>): boolean {
 
 /**
  * Translates a Flint-format spec (data + chart_spec + semantic_types) into a
- * basic Vega-Lite specification for rendering.
+ * basic Vega-Lite specification for rendering with tooltip interactions.
  */
 function translateFlintToVegaLite(
   args: Record<string, unknown>
@@ -173,6 +175,11 @@ function translateFlintToVegaLite(
     } else if (encodings.theta) {
       vlEncoding.theta = { field: encodings.theta.field, type: "quantitative" };
     }
+    vlEncoding.tooltip = [
+      encodings.color ? { field: encodings.color.field, type: "nominal" } : null,
+      encodings.size ? { field: encodings.size.field, type: "quantitative" } : null,
+      encodings.theta ? { field: encodings.theta.field, type: "quantitative" } : null,
+    ].filter(Boolean);
   } else {
     if (encodings.x) {
       vlEncoding.x = { field: encodings.x.field, type: "nominal" };
@@ -183,6 +190,11 @@ function translateFlintToVegaLite(
     if (encodings.color) {
       vlEncoding.color = { field: encodings.color.field, type: "nominal" };
     }
+    vlEncoding.tooltip = [
+      encodings.x ? { field: encodings.x.field, type: "nominal" } : null,
+      encodings.y ? { field: encodings.y.field, type: "quantitative" } : null,
+      encodings.color ? { field: encodings.color.field, type: "nominal" } : null,
+    ].filter(Boolean);
   }
 
   return {

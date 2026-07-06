@@ -13,12 +13,12 @@ public sealed class ChartProcessor(IEnumerable<IChartToolHandler> handlers, ICha
         return handlers.Any(h => h.CanHandle(toolName));
     }
 
-    public void ProcessToolCall(string prompt, FunctionCallContent call, object? result)
+    public async Task ProcessToolCallAsync(string prompt, FunctionCallContent call, object? result)
     {
         var handler = handlers.FirstOrDefault(h => h.CanHandle(call.Name));
         if (handler is not null)
         {
-            handler.Process(prompt, call, result, stateWriter);
+            await handler.ProcessAsync(prompt, call, result, stateWriter);
         }
     }
 }

@@ -25,7 +25,7 @@ public sealed class ChartInterceptingChatClient(
             options.Tools = null;
         }
 
-        InterceptToolResults(messages);
+        await InterceptToolResultsAsync(messages);
 
         await foreach (var update in base.GetStreamingResponseAsync(messages, options, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
         {
@@ -45,12 +45,12 @@ public sealed class ChartInterceptingChatClient(
             options.Tools = null;
         }
 
-        InterceptToolResults(messages);
+        await InterceptToolResultsAsync(messages);
 
         return await base.GetResponseAsync(messages, options, cancellationToken);
     }
 
-    private void InterceptToolResults(IEnumerable<ChatMessage> messages)
+    private async Task InterceptToolResultsAsync(IEnumerable<ChatMessage> messages)
     {
         var messageList = messages.ToList();
         
@@ -80,7 +80,7 @@ public sealed class ChartInterceptingChatClient(
                                     int lastUserIndex = messageList.FindLastIndex(m => m.Role == ChatRole.User);
                                     var lastUserPrompt = lastUserIndex >= 0 ? messageList[lastUserIndex].Text ?? "Generated Chart" : "Generated Chart";
 
-                                    chartProcessor.ProcessToolCall(lastUserPrompt, call, result.Result);
+                                    await chartProcessor.ProcessToolCallAsync(lastUserPrompt, call, result.Result);
                                     break;
                                 }
                             }

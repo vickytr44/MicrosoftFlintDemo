@@ -11,18 +11,18 @@ public abstract class BaseChartToolHandler : IChartToolHandler
 {
     public abstract bool CanHandle(string toolName);
 
-    public void Process(string prompt, FunctionCallContent call, object? result, IChartStateWriter stateWriter)
+    public async Task ProcessAsync(string prompt, FunctionCallContent call, object? result, IChartStateWriter stateWriter)
     {
         try
         {
-            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.Process: Entered for tool '{call.Name}'. Prompt: '{prompt}'");
+            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.ProcessAsync: Entered for tool '{call.Name}'. Prompt: '{prompt}'");
             var argsJson = JsonSerializer.Serialize(call.Arguments);
             using var doc = JsonDocument.Parse(argsJson);
             var root = doc.RootElement;
 
             if (root.ValueKind != JsonValueKind.Object)
             {
-                Console.WriteLine("[FLINT DEBUG] BaseChartToolHandler.Process: Root arguments are not a JSON object.");
+                Console.WriteLine("[FLINT DEBUG] BaseChartToolHandler.ProcessAsync: Root arguments are not a JSON object.");
                 return;
             }
 
@@ -49,7 +49,7 @@ public abstract class BaseChartToolHandler : IChartToolHandler
 
             if (target.ValueKind != JsonValueKind.Object)
             {
-                Console.WriteLine("[FLINT DEBUG] BaseChartToolHandler.Process: Spec/target is not a JSON object.");
+                Console.WriteLine("[FLINT DEBUG] BaseChartToolHandler.ProcessAsync: Spec/target is not a JSON object.");
                 return;
             }
 
@@ -69,9 +69,9 @@ public abstract class BaseChartToolHandler : IChartToolHandler
             if (chartSpec.ValueKind != JsonValueKind.Undefined) specObj["chart_spec"] = chartSpec;
 
             var flintSpecJson = JsonSerializer.SerializeToElement(specObj);
-            var compiledSpecJson = ProcessResult(flintSpecJson, result);
+            var compiledSpecJson = await ProcessResultAsync(flintSpecJson, result);
 
-            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.Process: Calling stateWriter.AddChart for backend: {backend}");
+            Console.WriteLine($"[FLINT DEBUG] BaseChartToolHandler.ProcessAsync: Calling stateWriter.AddChart for backend: {backend}");
             stateWriter.AddChart(prompt, flintSpecJson, compiledSpecJson, backend);
         }
         catch (Exception ex)
@@ -85,8 +85,8 @@ public abstract class BaseChartToolHandler : IChartToolHandler
     /// <summary>
     /// Processes the tool execution result and returns the compiled chart specification.
     /// </summary>
-    protected virtual JsonElement ProcessResult(JsonElement flintSpec, object? result)
+    protected virtual Task<JsonElement> ProcessResultAsync(JsonElement flintSpec, object? result)
     {
-        return flintSpec;
+        return Task.FromResult(flintSpec);
     }
 }

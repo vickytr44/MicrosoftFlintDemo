@@ -15,5 +15,5 @@ public interface IChartProcessor
     /// <summary>
     /// Processes the function call and its result, pushing updates to the chart state.
     /// </summary>
-    void ProcessToolCall(string prompt, FunctionCallContent call, object? result);
+    Task ProcessToolCallAsync(string prompt, FunctionCallContent call, object? result);
 }

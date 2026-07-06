@@ -15,5 +15,5 @@ public interface IChartToolHandler
     /// <summary>
     /// Processes the tool invocation and writes the resulting chart data.
     /// </summary>
-    void Process(string prompt, FunctionCallContent call, object? result, IChartStateWriter stateWriter);
+    Task ProcessAsync(string prompt, FunctionCallContent call, object? result, IChartStateWriter stateWriter);
 }
