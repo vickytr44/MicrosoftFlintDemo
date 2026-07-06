@@ -75,7 +75,8 @@ public sealed class FlintAgentInitializer(
         // Wrap with shared-state for CopilotKit co-agent state synchronization
         var agent = new FlintSharedStateAgent(
             chatClientAgent.AsBuilder().UseLogging(loggerFactory).Build(),
-            stateReader);
+            stateReader,
+            mcpTools);
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("\n🚀 Flint Chart AGUI Agent initialized successfully.");

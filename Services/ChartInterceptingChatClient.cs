@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using FlintChartAgent.Services.Abstractions;
 
@@ -52,6 +53,8 @@ public sealed class ChartInterceptingChatClient(
     private void InterceptToolResults(IEnumerable<ChatMessage> messages)
     {
         var messageList = messages.ToList();
+        
+        // 1. Process the latest tool execution if it exists
         if (messageList.Count > 0)
         {
             var lastMessage = messageList[^1];
@@ -85,6 +88,39 @@ public sealed class ChartInterceptingChatClient(
                     }
                 }
             }
+        }
+
+        // 2. Sanitize all tool results in the message history to prevent token rate limits (TPM limits)
+        foreach (var msg in messageList)
+        {
+            if (msg.Role == ChatRole.Tool)
+            {
+                foreach (var content in msg.Contents)
+                {
+                    if (content is FunctionResultContent result && result.Result is not null)
+                    {
+                        var resultString = GetResultString(result.Result);
+                        if (resultString.Contains("data:image/") || resultString.Contains("base64") || resultString.Length > 1000)
+                        {
+                            result.Result = "Image generated and saved successfully. [Base64 Image Data Truncated]";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static string GetResultString(object? result)
+    {
+        if (result is null) return string.Empty;
+        if (result is string str) return str;
+        try
+        {
+            return JsonSerializer.Serialize(result);
+        }
+        catch
+        {
+            return result.ToString() ?? string.Empty;
         }
     }
 }

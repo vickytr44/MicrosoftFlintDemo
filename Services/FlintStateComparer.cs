@@ -97,14 +97,21 @@ internal static class FlintStateComparer
 
     private static string GetRawOrString(JsonElement element)
     {
-        if (element.ValueKind == JsonValueKind.Undefined || element.ValueKind == JsonValueKind.Null)
+        try
+        {
+            if (element.ValueKind == JsonValueKind.Undefined || element.ValueKind == JsonValueKind.Null)
+            {
+                return string.Empty;
+            }
+            if (element.ValueKind == JsonValueKind.String)
+            {
+                return element.GetString() ?? string.Empty;
+            }
+            return element.GetRawText();
+        }
+        catch
         {
             return string.Empty;
         }
-        if (element.ValueKind == JsonValueKind.String)
-        {
-            return element.GetString() ?? string.Empty;
-        }
-        return element.GetRawText();
     }
 }
