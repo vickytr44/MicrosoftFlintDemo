@@ -113,10 +113,30 @@ public sealed class ChartInterceptingChatClient(
                 {
                     if (content is FunctionResultContent result && result.Result is not null)
                     {
-                        var resultString = GetResultString(result.Result);
-                        if (resultString.Contains("data:image/") || resultString.Contains("base64") || resultString.Length > 1000)
+                        // Find the matching function call to check the tool name
+                        string toolName = string.Empty;
+                        foreach (var helperMsg in messageList)
                         {
-                            result.Result = "Image generated and saved successfully. [Base64 Image Data Truncated]";
+                            if (helperMsg.Role == ChatRole.Assistant)
+                            {
+                                var call = helperMsg.Contents
+                                    .OfType<FunctionCallContent>()
+                                    .FirstOrDefault(c => c.CallId == result.CallId);
+                                if (call != null)
+                                {
+                                    toolName = call.Name;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (toolName == "render_chart")
+                        {
+                            var resultString = GetResultString(result.Result);
+                            if (resultString.Contains("data:image/") || resultString.Contains("base64") || resultString.Length > 1000)
+                            {
+                                result.Result = "Image generated and saved successfully. [Base64 Image Data Truncated]";
+                            }
                         }
                     }
                 }
