@@ -1,6 +1,11 @@
+#pragma warning disable MAAI001
+#pragma warning disable MEAI001
+
 using FlintChartAgent.Services.Abstractions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 namespace FlintChartAgent.Services.Implementations;
 
@@ -29,23 +34,85 @@ public sealed class FlintAgentInitializer(
             Console.WriteLine($"   🔧 {tool.Name}: {truncated}");
         }
 
-        // Build the AgentSkillsProvider that discovers skills over MCP
-        AgentSkillsProvider? skillsProvider = null;
+        // Pre-load the flint-chart-author skill content from MCP
+        string? skillContent = null;
         if (mcpService.Client is not null)
         {
             try
             {
+                Console.WriteLine("[FLINT] Pre-loading flint-chart-author skill from MCP resource 'flint://agent-skill'...");
+                var resourceResult = await mcpService.Client.ReadResourceAsync("flint://agent-skill");
+                if (resourceResult?.Contents != null && resourceResult.Contents.Count > 0)
+                {
+                    if (resourceResult.Contents[0] is TextResourceContents textContent)
+                    {
+                        skillContent = textContent.Text;
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"[FLINT] ✅ Skill content successfully loaded ({skillContent.Length} chars).");
+                        Console.ResetColor();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FLINT] ⚠️ Failed to load skill from flint://agent-skill: {ex.Message}");
+            }
+
+            if (string.IsNullOrEmpty(skillContent))
+            {
+                try
+                {
+                    Console.WriteLine("[FLINT] Falling back to loading skill from MCP prompt 'author_flint_chart'...");
+                    var promptResult = await mcpService.Client.GetPromptAsync("author_flint_chart", cancellationToken: cancellationToken);
+                    if (promptResult?.Messages != null && promptResult.Messages.Count > 0)
+                    {
+                        var textParts = new List<string>();
+                        foreach (var msg in promptResult.Messages)
+                        {
+                            if (msg.Content is TextContentBlock textBlock)
+                            {
+                                textParts.Add(textBlock.Text);
+                            }
+                        }
+                        if (textParts.Count > 0)
+                        {
+                            skillContent = string.Join("\n", textParts);
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine($"[FLINT] ✅ Fallback skill content successfully loaded ({skillContent.Length} chars).");
+                            Console.ResetColor();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[FLINT] ⚠️ MCP fallback prompt 'author_flint_chart' failed: {ex.Message}");
+                }
+            }
+        }
+
+        // Build the AgentSkillsProvider and register our dynamic inline skill
+        AgentSkillsProvider? skillsProvider = null;
+        if (!string.IsNullOrEmpty(skillContent))
+        {
+            try
+            {
+                var flintSkill = new AgentInlineSkill(
+                    name: "flint-chart-author",
+                    description: "Provides instructions for authoring Flint charts, including valid chart types and channel encodings.",
+                    instructions: skillContent
+                );
+
                 skillsProvider = new AgentSkillsProviderBuilder()
-                    .UseMcpSkills(mcpService.Client)
+                    .UseSkill(flintSkill)
                     .Build();
                 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("📖 Registered AgentSkillsProvider for Flint Chart MCP skills!");
+                Console.WriteLine("📖 Registered AgentInlineSkill for flint-chart-author!");
                 Console.ResetColor();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Failed to build MCP Skills Provider: {ex.Message}");
+                Console.WriteLine($"⚠️ Failed to build Agent Inline Skill: {ex.Message}");
             }
         }
 
@@ -74,7 +141,13 @@ public sealed class FlintAgentInitializer(
 
         // Wrap with shared-state for CopilotKit co-agent state synchronization
         var agent = new FlintSharedStateAgent(
-            chatClientAgent.AsBuilder().UseLogging(loggerFactory).Build(),
+            chatClientAgent.AsBuilder()
+                .UseLogging(loggerFactory)
+                .UseToolApproval(new ToolApprovalAgentOptions 
+                { 
+                    AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule] 
+                })
+                .Build(),
             stateReader,
             mcpTools);
 
