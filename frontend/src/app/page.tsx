@@ -73,7 +73,34 @@ function DashboardContent() {
           const matchingChart = state.charts.find(c => {
             try {
               const spec = typeof c.flintSpec === "string" ? JSON.parse(c.flintSpec) : c.flintSpec;
-              return JSON.stringify(spec) === JSON.stringify(args);
+              
+              // Extract the target spec from tool call args if wrapped in 'spec'
+              let targetArgs = args;
+              if (args && typeof args === "object" && "spec" in args) {
+                const innerSpec = args.spec;
+                if (typeof innerSpec === "string") {
+                  targetArgs = JSON.parse(innerSpec);
+                } else if (innerSpec && typeof innerSpec === "object") {
+                  targetArgs = innerSpec as Record<string, unknown>;
+                }
+              }
+
+              // Extract the target spec from c.flintSpec if wrapped in 'spec'
+              let targetSpec = spec;
+              if (spec && typeof spec === "object" && "spec" in spec) {
+                const innerSpec = spec.spec;
+                if (typeof innerSpec === "string") {
+                  targetSpec = JSON.parse(innerSpec);
+                } else if (innerSpec && typeof innerSpec === "object") {
+                  targetSpec = innerSpec as Record<string, unknown>;
+                }
+              }
+
+              // Normalize specs by comparing only chart_spec properties to avoid minor formatting differences in values
+              const specObj = (targetSpec?.chart_spec || targetSpec) as Record<string, unknown>;
+              const argsObj = (targetArgs?.chart_spec || targetArgs) as Record<string, unknown>;
+
+              return JSON.stringify(specObj) === JSON.stringify(argsObj);
             } catch {
               return false;
             }
