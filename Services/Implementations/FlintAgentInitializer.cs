@@ -123,7 +123,7 @@ public sealed class FlintAgentInitializer(
             Description = "A data visualization assistant that creates charts using the Flint chart system.",
             ChatOptions = new()
             {
-                Instructions = promptProvider.SystemPrompt,
+                //Instructions = promptProvider.SystemPrompt,
                 Tools = [.. mcpTools]
             }
         };

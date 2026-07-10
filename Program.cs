@@ -24,6 +24,11 @@ app.MapAGUI("/agent", agent);
 Console.ForegroundColor = ConsoleColor.Green;
 Console.WriteLine("\n🚀 Flint Chart AGUI Server is running at http://localhost:5000/agent");
 Console.WriteLine("   Connect CopilotKit frontend to this endpoint.");
+var llmSettings = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<LlmSettings>>().Value;
+var activeSettings = llmSettings.GetActiveSettings();
+Console.ForegroundColor = ConsoleColor.Cyan;
+Console.WriteLine($"   Using API Provider: {llmSettings.Provider}");
+Console.WriteLine($"   Using Model:        {activeSettings.Model}");
 Console.ResetColor();
 
 // 5. Run the application
