@@ -128,18 +128,41 @@ internal sealed class FlintSharedStateAgent(
         // throw an HTTP 400 error when JSON mode is combined with tool/function calling.
         // We instruct the model to speak to the user normally and explain what it is doing,
         // and we manage the co-agent state updates entirely in C# code.
-        ChatMessage stateContextMessage = new(
-            ChatRole.System,
-            [
-                new TextContent("Here is the current list of charts in JSON format:"),
-                new TextContent(state.GetRawText()),
-                new TextContent("You can use chart tools (like compile_chart, render_chart, create_chart_view) to generate or update charts as requested by the user. Speak to the user normally to explain what you are doing. Do not output raw JSON state blocks.")
-            ]);
+        // To avoid validation errors on strict APIs (like Google AI Studio/Gemini) that reject
+        // System messages at the end of the history or require strict User/Assistant alternation,
+        // we merge the current chart state and instructions directly into the last User message.
+        var lastMessage = messages.LastOrDefault();
+        IEnumerable<ChatMessage> finalMessages;
 
-        var firstRunMessages = messages.Append(stateContextMessage);
+        if (lastMessage != null && lastMessage.Role == ChatRole.User)
+        {
+            var newContents = new List<AIContent>(lastMessage.Contents);
+            newContents.Add(new TextContent("\n\n[System Note - Current Chart State]:"));
+            newContents.Add(new TextContent(state.GetRawText()));
+            newContents.Add(new TextContent("\nYou can use chart tools (like compile_chart, render_chart, create_chart_view) to generate or update charts as requested by the user. Speak to the user normally to explain what you are doing. Do not output raw JSON state blocks."));
+
+            var updatedLastMessage = new ChatMessage(ChatRole.User, newContents)
+            {
+                MessageId = lastMessage.MessageId
+            };
+
+            finalMessages = messages.SkipLast(1).Append(updatedLastMessage);
+        }
+        else
+        {
+            // Fallback: If there's no user message at the end, append a System message.
+            ChatMessage stateContextMessage = new(
+                ChatRole.System,
+                [
+                    new TextContent("Here is the current list of charts in JSON format:"),
+                    new TextContent(state.GetRawText()),
+                    new TextContent("You can use chart tools (like compile_chart, render_chart, create_chart_view) to generate or update charts as requested by the user. Speak to the user normally to explain what you are doing. Do not output raw JSON state blocks.")
+                ]);
+            finalMessages = messages.Append(stateContextMessage);
+        }
 
         var allUpdates = new List<AgentResponseUpdate>();
-        await foreach (var update in InnerAgent.RunStreamingAsync(firstRunMessages, session, firstRunOptions, cancellationToken).ConfigureAwait(false))
+        await foreach (var update in InnerAgent.RunStreamingAsync(finalMessages, session, firstRunOptions, cancellationToken).ConfigureAwait(false))
         {
             allUpdates.Add(update);
             yield return update; // Yield all updates to stream chat text live to the user
