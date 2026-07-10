@@ -95,13 +95,14 @@ public static class HostingExtensions
         services.AddSingleton<ApiKeyCredential>(sp =>
         {
             var llmSettings = sp.GetRequiredService<IOptions<LlmSettings>>().Value;
-            var apiKey = llmSettings.ApiKey;
+            var activeSettings = llmSettings.GetActiveSettings();
+            var apiKey = activeSettings.ApiKey;
 
             if (IsPlaceholderOrEmpty(apiKey))
             {
                 throw new InvalidOperationException(
-                    "LLM API key not configured. Set 'Llm:ApiKey' in appsettings.development.json " +
-                    "or the 'Llm__ApiKey' environment variable.");
+                    $"LLM API key not configured for provider '{llmSettings.Provider}'. Set 'Llm:{llmSettings.Provider}:ApiKey' in appsettings.development.json " +
+                    $"or the corresponding environment variable.");
             }
 
             return new ApiKeyCredential(apiKey);
@@ -124,6 +125,8 @@ public static class HostingExtensions
         if (string.IsNullOrWhiteSpace(key)) return true;
         var trimmed = key.Trim();
         return trimmed.Equals("YOUR_GROQ_API_KEY", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("YOUR_GROQ_API_KEY_HERE", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("YOUR_GEMINI_API_KEY_HERE", StringComparison.OrdinalIgnoreCase)
             || trimmed.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase);
     }
 }

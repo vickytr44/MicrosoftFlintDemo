@@ -137,17 +137,18 @@ public sealed class FlintAgentInitializer(
         var chatClientAgent = new ChatClientAgent(
             chatClient,
             agentOptions,
-            loggerFactory: loggerFactory);
+            loggerFactory: loggerFactory)
+            .AsBuilder()
+            .UseLogging(loggerFactory)
+            .UseToolApproval(new ToolApprovalAgentOptions
+            {
+                AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule]
+            })
+            .Build();
 
         // Wrap with shared-state for CopilotKit co-agent state synchronization
         var agent = new FlintSharedStateAgent(
-            chatClientAgent.AsBuilder()
-                .UseLogging(loggerFactory)
-                .UseToolApproval(new ToolApprovalAgentOptions 
-                { 
-                    AutoApprovalRules = [AgentSkillsProvider.ReadOnlyToolsAutoApprovalRule] 
-                })
-                .Build(),
+            chatClientAgent,
             stateReader,
             mcpTools);
 

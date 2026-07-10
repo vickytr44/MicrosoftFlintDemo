@@ -21,15 +21,16 @@ public sealed class FlintChatClientFactory(
 
     public IChatClient CreateChatClient()
     {
+        var activeSettings = _llmSettings.GetActiveSettings();
         var clientOptions = new OpenAIClientOptions
         {
-            Endpoint = new Uri(_llmSettings.Endpoint)
+            Endpoint = new Uri(activeSettings.Endpoint)
         };
 
         var openAiClient = new OpenAIClient(credential, clientOptions);
 
         return openAiClient
-            .GetChatClient(_llmSettings.Model)
+            .GetChatClient(activeSettings.Model)
             .AsIChatClient()
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "FlintChartAgent", configure: options =>

@@ -27,7 +27,6 @@ public sealed class SystemPromptProvider : IPromptProvider
            read/load the 'flint-chart-author' skill (or load 'flint://agent-skill' / use
            'author_flint_chart' prompt) to fetch correct chart types and channel encodings.
 
-        5. **After creating a chart**: Briefly explain what you created (chart type, data mappings)
-           but keep it concise. The chart itself is the primary output.
+        5. **After creating a chart**: Just say if the chart creation suceeded or not.
         """;
 }
